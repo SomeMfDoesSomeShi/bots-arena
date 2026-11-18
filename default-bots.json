@@ -1,0 +1,68 @@
+{
+  "format": "Game AI Lab default bot pack",
+  "version": 1,
+  "bots": {
+    "chess": [
+      {
+        "name": "Rookie",
+        "difficulty": "easy",
+        "strategy": "random"
+      },
+      {
+        "name": "Tactician",
+        "difficulty": "medium",
+        "strategy": "captures, checks, development"
+      },
+      {
+        "name": "Grandmaster",
+        "difficulty": "hard",
+        "strategy": "material evaluation"
+      }
+    ],
+    "connect": [
+      {
+        "name": "Dropper",
+        "difficulty": "easy",
+        "strategy": "random legal column"
+      },
+      {
+        "name": "Blocker",
+        "difficulty": "medium",
+        "strategy": "win or block, center preference"
+      },
+      {
+        "name": "Four Seeker",
+        "difficulty": "hard",
+        "strategy": "win or block, center preference"
+      }
+    ],
+    "pong": [
+      {
+        "name": "Wobbler",
+        "difficulty": "easy"
+      },
+      {
+        "name": "Rally",
+        "difficulty": "medium"
+      },
+      {
+        "name": "Wall Reader",
+        "difficulty": "hard"
+      }
+    ],
+    "race": [
+      {
+        "name": "Sunday Driver",
+        "difficulty": "easy"
+      },
+      {
+        "name": "Lane Picker",
+        "difficulty": "medium"
+      },
+      {
+        "name": "Apex",
+        "difficulty": "hard"
+      }
+    ]
+  }
+}
