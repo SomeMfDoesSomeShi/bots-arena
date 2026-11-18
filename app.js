@@ -1,73 +1,728 @@
-/* Game AI Lab — self-contained browser game + visual bot runtime */
-const $=id=>document.getElementById(id);
-const games={chess:{name:"Chess",category:"STRATEGY",help:"You play White. Select a piece, then a legal destination. The bot plays Black."},connect:{name:"Connect Four",category:"TACTICAL",help:"You are Red. Click a column to drop a piece. Connect four in any direction."},pong:{name:"3D Pong",category:"ARCADE · 3D",help:"Move your paddle with W/S or ↑/↓. Keep the ball in play. First to 7 wins."},race:{name:"Neon Racer",category:"REAL-TIME",help:"Use ←/→ or A/D to change lanes. Dodge traffic and survive for 30 seconds."}};
-const nodeTypes={
- start:{label:"START · TURN",color:"#62e6d2",desc:"Entry point. Runs once per decision or frame.",inputs:[],outputs:["exec"]},
- input:{label:"GAME INPUT",color:"#66a8ff",desc:"Read information provided by the current game.",inputs:[],outputs:["value"],fields:[["key","Input","select",["board","legalMoves","myPieces","opponentPieces","scores","ballX","ballY","paddleY","speed","distance","obstacles","lane","time","random"]]]},
- variable:{label:"VARIABLE",color:"#d6a6ff",desc:"Store and retrieve a named value.",inputs:["value"],outputs:["value"],fields:[["name","Name","text","memory"],["initial","Initial value","text","0"]]},
- list:{label:"LIST",color:"#c4a4ff",desc:"Create a list of values or moves.",inputs:["item"],outputs:["list"],fields:[["items","Items (comma separated)","text","0,1,2,3"]]},
- math:{label:"MATH",color:"#ffb86b",desc:"Basic arithmetic.",inputs:["A","B"],outputs:["value"],fields:[["op","Operation","select",["+","-","×","÷","%","min","max"]]]},
- compare:{label:"COMPARE",color:"#ffb86b",desc:"Compare two values.",inputs:["A","B"],outputs:["bool"],fields:[["op","Condition","select",["=","≠",">","<",">=","<="]]]},
- logic:{label:"LOGIC",color:"#ffb86b",desc:"Combine boolean values.",inputs:["A","B"],outputs:["bool"],fields:[["op","Operation","select",["AND","OR","NOT"]]]},
- choose:{label:"CHOOSE",color:"#e7a0b2",desc:"Choose between two values using a condition.",inputs:["condition","true","false"],outputs:["value"],fields:[]},
- output:{label:"GAME OUTPUT",color:"#62e6d2",desc:"Send an action back to the game.",inputs:["action"],outputs:[],fields:[["action","Output","select",["move","column","paddle","lane","steer","wait"]]]}
+
+const $ = id => document.getElementById(id);
+
+const GAME_INFO = {
+  chess: {
+    name: "Chess",
+    inputs: ["Board", "Legal Moves", "Current Turn", "Piece At Position", "Is Check", "Opponent Threats"],
+    outputs: ["Choose Move"],
+  },
+  connect4: {
+    name: "Puissance 4",
+    inputs: ["Board", "Available Columns", "Current Player", "Column Height", "Winning Threats"],
+    outputs: ["Choose Column"],
+  },
+  pingpong: {
+    name: "3D Ping Pong",
+    inputs: ["Ball Position X", "Ball Position Y", "Ball Position Z", "Ball Velocity", "Paddle Position", "Ball Approaching"],
+    outputs: ["Paddle Target X", "Paddle Target Y", "Serve"],
+  },
+  racing: {
+    name: "Racing AI",
+    inputs: ["Speed", "Front Distance", "Front Left Distance", "Front Right Distance", "Left Distance", "Right Distance", "Rear Distance", "Opponent Distance", "Heading"],
+    outputs: ["Throttle", "Brake", "Steering"],
+  },
+  snake: {
+    name: "Snake",
+    inputs: ["Snake Position", "Snake Direction", "Food Position", "Body Positions", "Wall Distances", "Available Directions"],
+    outputs: ["Choose Direction"],
+  }
 };
-let bot={name:"My First Bot",description:"",game:"chess",nodes:[],links:[]},selected=null,linkStart=null,nodeId=1,currentGame="chess",gameState=null,customOpponent=null,raf=null,keys={},arenaImport=null;
-function addNode(type,x=80+Math.random()*220,y=90+Math.random()*250,fields={}){let t=nodeTypes[type];let n={id:nodeId++,type,x,y,fields:{}};t.fields?.forEach(f=>n.fields[f[0]]=fields[f[0]]??f[3]);bot.nodes.push(n);renderNodes();selectNode(n.id)}
-function renderLibrary(){let groups=[["FLOW",["start"]],["INPUTS",["input"]],["DATA",["variable","list"]],["OPERATORS",["math","compare","logic","choose"]],["OUTPUTS",["output"]]]; $("library").innerHTML=groups.map(([g,arr])=>`<div class="tiny" style="margin:15px 0 5px;letter-spacing:1px">${g}</div>`+arr.map(k=>`<div class="lib-node" style="--node:${nodeTypes[k].color}" data-type="${k}">${nodeTypes[k].label}<small>${nodeTypes[k].desc}</small></div>`).join("")).join("");$("library").querySelectorAll(".lib-node").forEach(e=>e.onclick=()=>addNode(e.dataset.type))}
-function renderNodes(){const wrap=$("nodes");wrap.innerHTML="";$("nodeCount").textContent=bot.nodes.length+" NODES";bot.nodes.forEach(n=>{let t=nodeTypes[n.type],el=document.createElement("div");el.className="node"+(selected===n.id?" selected":"");el.style.cssText=`left:${n.x}px;top:${n.y}px;--node:${t.color}`;el.dataset.id=n.id;let ins=t.inputs.map(p=>`<div class="port-row"><span><i class="port in" data-port="${p}" data-node="${n.id}"></i>${p}</span></div>`).join("");let outs=t.outputs.map(p=>`<div class="port-row" style="justify-content:flex-end"><span>${p}</span><i class="port out" data-port="${p}" data-node="${n.id}"></i></div>`).join("");let fields=(t.fields||[]).map(f=>{let v=n.fields[f[0]]??"";return `<label style="display:block;margin:5px 0;color:#8794a6">${f[1]}${f[2]==="select"?`<select data-field="${f[0]}">${f[3].map(o=>`<option ${o===v?"selected":""}>${o}</option>`).join("")}</select>`:`<input data-field="${f[0]}" value="${escapeHtml(v)}">`}</label>`}).join("");el.innerHTML=`<div class="node-head">${t.label}<span class="node-del" title="Delete">×</span></div><div class="node-body">${ins}${fields}${outs||(!ins?"<small>Entry node</small>":"")}</div>`;wrap.appendChild(el);el.onclick=e=>{if(e.target.classList.contains("port"))return;selectNode(n.id)};el.querySelector(".node-del").onclick=e=>{e.stopPropagation();bot.nodes=bot.nodes.filter(a=>a.id!==n.id);bot.links=bot.links.filter(l=>l.from!==n.id&&l.to!==n.id);selected=null;renderNodes();renderWires();renderInspector()};el.querySelector(".node-head").onpointerdown=e=>dragNode(e,n,el);el.querySelectorAll("[data-field]").forEach(inp=>inp.onchange=()=>{n.fields[inp.dataset.field]=inp.value;renderInspector()})});renderWires()}
-function escapeHtml(s){return String(s).replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"}[c]))}
-function dragNode(e,n,el){if(e.target.classList.contains("node-del"))return;let sx=e.clientX,sy=e.clientY,ox=n.x,oy=n.y;el.setPointerCapture?.(e.pointerId);function move(ev){n.x=Math.max(0,ox+ev.clientX-sx);n.y=Math.max(25,oy+ev.clientY-sy);el.style.left=n.x+"px";el.style.top=n.y+"px";renderWires()}function up(){window.removeEventListener("pointermove",move);window.removeEventListener("pointerup",up)}window.addEventListener("pointermove",move);window.addEventListener("pointerup",up)}
-function selectNode(id){selected=id;renderNodes();renderInspector()}
-function renderInspector(){let n=bot.nodes.find(x=>x.id===selected);$("inspectorContent").innerHTML=n?`<b style="color:${nodeTypes[n.type].color}">${nodeTypes[n.type].label}</b><p class="tiny">${nodeTypes[n.type].desc}</p><p class="tiny">Node ID: ${n.id}</p>`:"Select a node on the canvas to edit its values."}
-function renderWires(){let svg=$("wires");svg.innerHTML="";bot.links.forEach(l=>{let a=bot.nodes.find(n=>n.id===l.from),b=bot.nodes.find(n=>n.id===l.to);if(!a||!b)return;let x1=a.x+205,y1=a.y+66,x2=b.x,y2=b.y+66;let p=document.createElementNS("http://www.w3.org/2000/svg","path");p.setAttribute("d",`M${x1} ${y1} C${x1+70} ${y1},${x2-70} ${y2},${x2} ${y2}`);p.setAttribute("stroke","#62e6d2");p.setAttribute("stroke-width","2.5");p.setAttribute("fill","none");svg.appendChild(p)});$("nodes").querySelectorAll(".port").forEach(p=>p.onclick=e=>{e.stopPropagation();let id=+p.dataset.node;if(p.classList.contains("out")){linkStart={id,port:p.dataset.port};p.style.boxShadow="0 0 0 4px #62e6d255"}else if(linkStart&&linkStart.id!==id){bot.links=bot.links.filter(l=>!(l.from===linkStart.id&&l.to===id));bot.links.push({from:linkStart.id,to:id,fromPort:linkStart.port,toPort:p.dataset.port});linkStart=null;renderWires()}else linkStart=null})}
-function loadDefault(game,difficulty){let b=defaultBots[game][difficulty];return JSON.parse(JSON.stringify(b))}
-const defaultBots={
- chess:{easy:{name:"Rookie",description:"Picks a legal move with a small preference for captures.",game:"chess",strategy:"random"},medium:{name:"Tactician",description:"Prioritizes captures, checks and central development.",game:"chess",strategy:"chess"},hard:{name:"Grandmaster",description:"Searches legal continuations with a simple material evaluation.",game:"chess",strategy:"chess"}},
- connect:{easy:{name:"Dropper",game:"connect",strategy:"random"},medium:{name:"Blocker",game:"connect",strategy:"connect"},hard:{name:"Four Seeker",game:"connect",strategy:"connect"}},
- pong:{easy:{name:"Wobbler",game:"pong",strategy:"pong",reaction:.12},medium:{name:"Rally",game:"pong",strategy:"pong",reaction:.35},hard:{name:"Wall Reader",game:"pong",strategy:"pong",reaction:.8}},
- race:{easy:{name:"Sunday Driver",game:"race",strategy:"race",reaction:.2},medium:{name:"Lane Picker",game:"race",strategy:"race",reaction:.5},hard:{name:"Apex",game:"race",strategy:"race",reaction:.85}}
+
+const NODE_TYPES = {
+  event: {
+    label: "START / EVENT",
+    category: "EVENTS",
+    color: "#8b68ff",
+    description: "Déclenche l'exécution du bot."
+  },
+  input: {
+    label: "GAME INPUT",
+    category: "GAME INPUTS",
+    color: "#278eae",
+    description: "Récupère une information du jeu."
+  },
+  variable: {
+    label: "VARIABLE",
+    category: "VARIABLES",
+    color: "#b47be9",
+    description: "Stocke une valeur."
+  },
+  number: {
+    label: "NUMBER",
+    category: "VALUES",
+    color: "#4d9ce0",
+    description: "Une valeur numérique."
+  },
+  boolean: {
+    label: "BOOLEAN",
+    category: "VALUES",
+    color: "#4d9ce0",
+    description: "Une valeur vraie ou fausse."
+  },
+  compare: {
+    label: "COMPARISON",
+    category: "LOGIC",
+    color: "#d29c49",
+    description: "Compare deux valeurs."
+  },
+  math: {
+    label: "MATH",
+    category: "LOGIC",
+    color: "#d29c49",
+    description: "Effectue une opération mathématique."
+  },
+  condition: {
+    label: "IF / ELSE",
+    category: "LOGIC",
+    color: "#d29c49",
+    description: "Exécute une branche selon une condition."
+  },
+  random: {
+    label: "RANDOM",
+    category: "LOGIC",
+    color: "#d29c49",
+    description: "Génère une valeur aléatoire."
+  },
+  output: {
+    label: "GAME OUTPUT",
+    category: "GAME OUTPUTS",
+    color: "#39b98d",
+    description: "Envoie une décision au jeu."
+  }
 };
-function botAction(b,game,s){let moves=s.legalMoves||[];let strat=b?.strategy||"custom";if(game==="connect"){let legal=s.legalMoves||[0,1,2,3,4,5,6];if(strat==="random")return legal[Math.floor(Math.random()*legal.length)];let wins=legal.filter(c=>connectWin(s.board,c,2));if(wins.length)return wins[0];let blocks=legal.filter(c=>connectWin(s.board,c,1));if(blocks.length)return blocks[0];let center=[3,2,4,1,5,0,6].filter(c=>legal.includes(c));return center[Math.floor(Math.random()*Math.min(center.length,strat==="connect"?1:3))]??3}
-if(game==="chess"){if(!moves.length)return null;if(strat==="random")return moves[Math.floor(Math.random()*moves.length)];let scored=moves.map(m=>({m,score:(m.captured?pieceVal(m.captured)*10:0)+(m.san?.includes("+")?5:0)+(m.san?.includes("#")?1000:0)+(Math.random()*1.4)}));scored.sort((a,b)=>b.score-a.score);if(strat==="chess"&&b.name==="Grandmaster")scored.reverse().reverse();return scored[0].m}
-if(game==="pong")return s.ballY+(Math.random()-.5)*(1-(b.reaction||.5))*160;
-if(game==="race"){let safe=[0,1,2].filter(l=>!s.obstacles.some(o=>o.lane===l&&o.y>0.55));return safe.includes(s.lane)?s.lane:(safe[0]??s.lane)}return null}
-function pieceVal(p){return ({p:1,n:3,b:3,r:5,q:9,k:20})[p]||0}
-function connectWin(board,col,player){let r=5;while(r>=0&&board[r][col])r--;if(r<0)return false;let copy=board.map(x=>x.slice());copy[r][col]=player;for(let dr=-1;dr<=1;dr++)for(let dc=-1;dc<=1;dc++){let count=1;for(let d of [-1,1]){let rr=r+dr*d,cc=col+dc*d;while(rr>=0&&rr<6&&cc>=0&&cc<7&&copy[rr][cc]===player){count++;rr+=dr*d;cc+=dc*d}}if(count>=4)return true}return false}
-function evalGraph(gameState){let values={};let sorted=bot.nodes.slice().sort((a,b)=>a.y-b.y||a.x-b.x);let input={board:gameState?.board,legalMoves:gameState?.legalMoves,myPieces:gameState?.myPieces,opponentPieces:gameState?.opponentPieces,scores:gameState?.scores,ballX:gameState?.ballX,ballY:gameState?.ballY,paddleY:gameState?.paddleY,speed:gameState?.speed,distance:gameState?.distance,obstacles:gameState?.obstacles,lane:gameState?.lane,time:gameState?.time,random:Math.random()};for(let n of sorted){let linked=port=>{let l=bot.links.find(x=>x.to===n.id&&x.toPort===port);return l?values[l.from]:undefined};let f=n.fields||{};switch(n.type){case"input":values[n.id]=input[f.key];break;case"variable":values[n.id]=linked("value")??(Number(f.initial)||f.initial);break;case"list":values[n.id]=(f.items||"").split(",").map(x=>x.trim());break;case"math":{let a=Number(linked("A")??0),b=Number(linked("B")??0);values[n.id]=({"+":a+b,"-":a-b,"×":a*b,"÷":b?a/b:0,"%":b?a%b:0,min:Math.min(a,b),max:Math.max(a,b)})[f.op];break}case"compare":{let a=linked("A"),b=linked("B");values[n.id]=({"=":a==b,"≠":a!=b,">":a>b,"<":a<b,">=":a>=b,"<=":a<=b})[f.op];break}case"logic":{let a=!!linked("A"),b=!!linked("B");values[n.id]=f.op==="NOT"?!a:f.op==="AND"?a&&b:a||b;break}case"choose":values[n.id]=linked("condition")?linked("true"):linked("false");break;case"output":values.action=linked("action")??input.legalMoves?.[0]??0;break;case"variable":break}}return values.action}
-function botForDifficulty(game,diff){if(diff==="custom")return bot;return loadDefault(game,diff)}
-function switchView(name){document.querySelectorAll(".view").forEach(v=>v.classList.toggle("active",v.id===name));document.querySelectorAll(".navbtn").forEach(b=>b.classList.toggle("active",b.dataset.view===name))}
-document.querySelectorAll(".navbtn").forEach(b=>b.onclick=()=>switchView(b.dataset.view));
-document.querySelectorAll(".game-card").forEach(c=>c.onclick=()=>startGame(c.dataset.game));
-function startGame(g){currentGame=g;switchView("play");$("playTitle").textContent=games[g].name;$("gameCategory").textContent=games[g].category;$("gameHelp").textContent=games[g].help;$("difficulty").value="medium";initGame()}
-$("backGames").onclick=()=>{stopLoop();switchView("arcade")};$("restartGame").onclick=initGame;
-function setStatus(s){$("gameStatus").textContent=s}
-function log(s){$("gameLog").textContent=s}
-function initGame(){stopLoop();$("gameStage").innerHTML="";log("New match started.");setStatus("Your turn");if(currentGame==="chess")initChess();if(currentGame==="connect")initConnect();if(currentGame==="pong")initPong();if(currentGame==="race")initRace()}
-function getBot(){return botForDifficulty(currentGame,$("difficulty").value)}
-function botMoveChess(){let moves=gameState.moves({verbose:true});let b=getBot(),m=botAction(b,"chess",{legalMoves:moves});if(m)gameState.move(m);renderChess();if(gameState.game_over())setStatus("Game over");else setStatus("Your turn")}
-let chessSelected=null;
-function initChess(){if(!window.Chess){$("gameStage").innerHTML="<p>Chess engine needs an internet connection to load chess.js.</p>";return}gameState=new Chess();renderChess()}
-function renderChess(){let board=gameState.board(),html='<div class="chess-board">';for(let r=0;r<8;r++)for(let c=0;c<8;c++){let p=board[r][c],sq=String.fromCharCode(97+c)+(8-r),sym=p?({"wk":"♔","wq":"♕","wr":"♖","wb":"♗","wn":"♘","wp":"♙","bk":"♚","bq":"♛","br":"♜","bb":"♝","bn":"♞","bp":"♟"})[p.color+p.type]:"";html+=`<div class="sq ${(r+c)%2?"dark":"light"} ${chessSelected===sq?"pick":""}" data-sq="${sq}">${sym}</div>`}html+="</div>";$("gameStage").innerHTML=html;$("gameStage").querySelectorAll(".sq").forEach(el=>el.onclick=()=>{let sq=el.dataset.sq;if(gameState.game_over()||gameState.turn()!=="w")return;if(!chessSelected){let p=gameState.get(sq);if(p?.color==="w"){chessSelected=sq;renderChess()}}else{let move=gameState.move({from:chessSelected,to:sq,promotion:"q"});chessSelected=null;if(move){log(move.san);renderChess();if(gameState.game_over())setStatus("Game over");else{setStatus("Bot thinking…");setTimeout(botMoveChess,350)}}else renderChess()}})}
-function initConnect(){gameState={board:Array.from({length:6},()=>Array(7).fill(0)),turn:1,over:false};renderConnect()}
-function renderConnect(){let html='<div class="connect-board">';for(let r=0;r<6;r++)for(let c=0;c<7;c++)html+=`<div class="connect-cell ${gameState.board[r][c]===1?"red":gameState.board[r][c]===2?"yellow":""}" data-col="${c}"></div>`;html+="</div>";$("gameStage").innerHTML=html;$("gameStage").querySelectorAll(".connect-cell").forEach(el=>el.onclick=()=>{if(gameState.over||gameState.turn!==1)return;connectDrop(+el.dataset.col,1);if(!gameState.over){setStatus("Bot thinking…");setTimeout(()=>{let legal=[0,1,2,3,4,5,6].filter(c=>gameState.board[0][c]===0);if(!legal.length)return;let col=botAction(getBot(),"connect",{board:gameState.board,legalMoves:legal});connectDrop(col,2)},250)}})}
-function connectDrop(c,p){let r=5;while(r>=0&&gameState.board[r][c])r--;if(r<0)return;gameState.board[r][c]=p;renderConnect();if(connectWin(gameState.board,c,p)){gameState.over=true;setStatus(p===1?"You win!":"Bot wins!");log(p===1?"Victory":"Defeat")}else if(gameState.board[0].every(Boolean)){gameState.over=true;setStatus("Draw")}else{gameState.turn=p===1?2:1;setStatus(p===1?"Bot thinking…":"Your turn")}}
-function initPong(){let stage=$("gameStage");stage.innerHTML='<div class="pong-game"><div class="score" id="pongScore">0 : 0</div><div class="pong-field"></div><div class="pong-player" id="pongPlayer"></div><div class="pong-enemy" id="pongEnemy"></div><div class="pong-orb" id="pongOrb"></div></div>';gameState={py:150,ey:150,x:330,y:180,vx:4,vy:2,score:[0,0],last:0};setStatus("Use W/S or ↑/↓ to move");startLoop(pongFrame)}
-function pongFrame(t){if(!gameState||currentGame!=="pong")return;let s=gameState,dt=Math.min((t-s.last||16)/16,2);s.last=t;let game=$("gameStage").querySelector(".pong-game");if(!game)return;let h=game.clientHeight,w=game.clientWidth;s.py=Math.max(35,Math.min(h-100,s.py+(keys.ArrowUp||keys.w?-6:0)+(keys.ArrowDown||keys.s?6:0)));let target=s.y-32,act=botAction(getBot(),"pong",{ballY:target/ h* h});s.ey+=(Math.max(0,Math.min(h-100,act))-s.ey)*.055;s.x+=s.vx*dt;s.y+=s.vy*dt;if(s.y<38||s.y>h-38)s.vy*=-1;if(s.x<58&&s.y>s.py&&s.y<s.py+65){s.vx=Math.abs(s.vx)*1.05;s.vy+=(s.y-s.py-32)*.08}if(s.x>w-58&&s.y>s.ey&&s.y<s.ey+65){s.vx=-Math.abs(s.vx)*1.04;s.vy+=(s.y-s.ey-32)*.08}if(s.x<0||s.x>w){s.score[s.x<0?1:0]++;s.x=w/2;s.y=h/2;s.vx=s.x<0?-4:4;$("pongScore").textContent=s.score.join(" : ");if(Math.max(...s.score)>=7){setStatus(s.score[0]>s.score[1]?"You win!":"Bot wins!");stopLoop();return}}$("pongPlayer").style.top=s.py+"px";$("pongEnemy").style.top=s.ey+"px";$("pongOrb").style.left=s.x+"px";$("pongOrb").style.top=s.y+"px";raf=requestAnimationFrame(pongFrame)}
-function initRace(){let stage=$("gameStage");stage.innerHTML='<div class="race-game"><div class="race-road"></div><div class="race-hud" id="raceHud">DISTANCE 0 m</div><div class="car" id="raceCar">🏎️</div><div id="traffic"></div></div>';gameState={lane:1,distance:0,time:0,obstacles:[],last:0,spawn:0};setStatus("Use ←/→ or A/D to steer");startLoop(raceFrame)}
-function raceFrame(t){if(!gameState||currentGame!=="race")return;let s=gameState,dt=Math.min((t-s.last||16)/1000,.04);s.last=t;s.time+=dt;s.distance+=dt*18;s.spawn+=dt;if(keys.ArrowLeft||keys.a)s.lane=Math.max(0,s.lane-1);if(keys.ArrowRight||keys.d)s.lane=Math.min(2,s.lane+1);if(s.spawn>1.1){s.spawn=0;s.obstacles.push({lane:Math.floor(Math.random()*3),y:-40})}s.obstacles.forEach(o=>o.y+=dt*190);let action=botAction(getBot(),"race",{lane:s.lane,obstacles:s.obstacles.map(o=>({lane:o.lane,y:o.y/450})),distance:s.distance});let car=$("raceCar");car.style.left=(29+s.lane*20)+"%";$("raceHud").textContent="DISTANCE "+Math.floor(s.distance)+" m · "+Math.ceil(30-s.time)+"s";$("traffic").innerHTML=s.obstacles.map(o=>`<span class="traffic" style="left:${27+o.lane*21}%;top:${o.y}px">🚙</span>`).join("");if(s.obstacles.some(o=>o.lane===s.lane&&o.y>365&&o.y<430)){setStatus("Crash! Distance: "+Math.floor(s.distance)+" m");stopLoop();return}s.obstacles=s.obstacles.filter(o=>o.y<500);if(s.time>=30){setStatus("Finish! Distance: "+Math.floor(s.distance)+" m");stopLoop();return}raf=requestAnimationFrame(raceFrame)}
-function startLoop(fn){stopLoop();raf=requestAnimationFrame(fn)}function stopLoop(){if(raf)cancelAnimationFrame(raf);raf=null}
-window.addEventListener("keydown",e=>{keys[e.key]=true;if(["ArrowUp","ArrowDown","ArrowLeft","ArrowRight"," "].includes(e.key))e.preventDefault()});window.addEventListener("keyup",e=>keys[e.key]=false);
-$("studioGame").onchange=e=>{bot.game=e.target.value};
-$("newBot").onclick=()=>{bot={name:"Untitled Bot",description:"",game:$("studioGame").value,nodes:[],links:[]};$("botName").textContent=bot.name;$("botDescription").value="";selected=null;addNode("start",55,80);addNode("input",330,80);addNode("output",650,80)};
-$("botName").oninput=()=>bot.name=$("botName").textContent.trim();$("botDescription").oninput=e=>bot.description=e.target.value;
-$("clearCanvas").onclick=()=>{if(confirm("Reset all nodes?")){bot.nodes=[];bot.links=[];selected=null;renderNodes();renderInspector()}};
-$("runPreview").onclick=()=>{let result=evalGraph({legalMoves:[0,1,2,3],ballY:120,lane:1,obstacles:[]});$("compileStatus").textContent="● OUTPUT: "+JSON.stringify(result??"no output");};
-$("exportBot").onclick=()=>{bot.name=$("botName").textContent.trim()||"Untitled Bot";bot.game=$("studioGame").value;bot.description=$("botDescription").value;let blob=new Blob([JSON.stringify(bot,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download=bot.name.toLowerCase().replace(/[^a-z0-9]+/g,"-")+".json";a.click();URL.revokeObjectURL(a.href)};
-function importFile(file,callback){let r=new FileReader();r.onload=()=>{try{let b=JSON.parse(r.result);if(!b.nodes||!Array.isArray(b.nodes))throw Error("Invalid blueprint");callback(b)}catch(e){alert("Could not import bot: "+e.message)}};r.readAsText(file)}
-$("importBot").onchange=e=>{let f=e.target.files[0];if(f)importFile(f,b=>{bot=b;nodeId=Math.max(1,...b.nodes.map(n=>n.id+1));$("botName").textContent=b.name||"Imported bot";$("botDescription").value=b.description||"";$("studioGame").value=b.game||"chess";selected=null;renderNodes();renderInspector()})};
-$("downloadDefaults").onclick=()=>{let blob=new Blob([JSON.stringify(defaultBots,null,2)],{type:"application/json"}),a=document.createElement("a");a.href=URL.createObjectURL(blob);a.download="game-ai-lab-default-bots.json";a.click();URL.revokeObjectURL(a.href)};
-$("opponentType").onchange=e=>$("opponentFileLabel").classList.toggle("hidden",e.target.value!=="import");$("opponentFile").onchange=e=>{let f=e.target.files[0];if(f)importFile(f,b=>arenaImport=b)};
-$("startBattle").onclick=()=>{let g=$("arenaGame").value,opp=$("opponentType").value;if(opp==="import"&&!arenaImport){$("arenaResult").textContent="Import an opponent blueprint first.";return}if(opp==="import"&&arenaImport.game!==g){$("arenaResult").textContent="The imported bot is for "+arenaImport.game+". Choose that game or import a matching bot.";return}let own=bot.game===g?bot:loadDefault(g,"medium"),other=opp==="import"?arenaImport:loadDefault(g,opp);let res=simulate(g,own,other);$("arenaResult").innerHTML=`<b style="color:var(--cyan)">${escapeHtml(res.winner)}</b><p>${escapeHtml(res.detail)}</p><small>SIMULATION · ${escapeHtml(g.toUpperCase())} · ${res.rounds} DECISIONS</small>`};
-function simulate(g,a,b){if(g==="connect"){let board=Array.from({length:6},()=>Array(7).fill(0)),turn=1,winner="Draw",round=0;while(round<42){let legal=[0,1,2,3,4,5,6].filter(c=>board[0][c]===0);if(!legal.length)break;let s={board,legalMoves:legal};let col=botAction(turn===1?a:b,"connect",s);if(!legal.includes(Number(col)))col=legal[Math.floor(Math.random()*legal.length)];let r=5;while(board[r][col])r--;board[r][col]=turn;round++;if(connectWin(board,col,turn)){winner=turn===1?a.name||"Your bot":b.name||"Opponent";break}turn=3-turn}return{winner,rounds:round,detail:"Connect Four simulation finished."}}if(g==="chess")return{winner:"Simulation complete",rounds:Math.floor(12+Math.random()*30),detail:"Blueprint matchup is a lightweight strategy simulation. For a full chess match, launch Chess and select a difficulty."};return{winner:"Simulation complete",rounds:g==="race"?30:50,detail:"Both bot strategies were evaluated in a real-time simulation profile. Play the game to watch live action."}}
-renderLibrary();addNode("start",55,80);addNode("input",330,80);addNode("output",650,80);$("botDescription").value=bot.description;
+
+let currentGame = "chess";
+let selectedGame = "chess";
+let nodes = [];
+let selectedNode = null;
+let savedBots = JSON.parse(localStorage.getItem("neonlab_bots") || "[]");
+let dragging = null;
+
+function showPage(page) {
+  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  $(page + "-page").classList.add("active");
+
+  document.querySelectorAll(".nav-button").forEach(b => {
+    b.classList.toggle("active", b.dataset.page === page);
+  });
+
+  const titles = {
+    games: "Game Library",
+    bots: "My Bots",
+    editor: "Visual Bot Editor",
+    arena: "Bot Arena"
+  };
+
+  $("page-title").textContent = titles[page] || "Game Session";
+
+  if (page === "bots") renderBots();
+  if (page === "editor") refreshEditor();
+}
+
+function selectGame(game) {
+  selectedGame = game;
+  currentGame = game;
+  $("selected-game-title").textContent = GAME_INFO[game].name.toUpperCase();
+  $("game-page").classList.add("active");
+  document.querySelectorAll(".page:not(#game-page)").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav-button").forEach(b => b.classList.remove("active"));
+
+  if (game === "connect4") renderConnect4();
+  else if (game === "snake") renderSnake();
+  else if (game === "chess") renderChess();
+  else if (game === "pingpong") renderPingPong();
+  else if (game === "racing") renderRacing();
+}
+
+$("editor-game").addEventListener("change", e => {
+  currentGame = e.target.value;
+  nodes = [];
+  selectedNode = null;
+  refreshEditor();
+});
+
+function refreshEditor() {
+  currentGame = $("editor-game").value;
+  $("workspace-game").textContent = GAME_INFO[currentGame].name.toUpperCase();
+  renderNodeLibrary();
+  renderNodes();
+}
+
+function renderNodeLibrary() {
+  const root = $("node-library-content");
+  root.innerHTML = "";
+
+  const categories = [...new Set(Object.values(NODE_TYPES).map(n => n.category))];
+
+  categories.forEach(category => {
+    const title = document.createElement("div");
+    title.className = "node-category";
+    title.textContent = category;
+    root.appendChild(title);
+
+    Object.entries(NODE_TYPES).filter(([key, node]) => node.category === category).forEach(([key, node]) => {
+      const button = document.createElement("button");
+      button.className = "library-node";
+      button.textContent = "+ " + node.label;
+      button.onclick = () => addNode(key);
+      root.appendChild(button);
+    });
+  });
+
+  const inputs = document.createElement("div");
+  inputs.className = "node-category";
+  inputs.textContent = "AVAILABLE INPUTS";
+  root.appendChild(inputs);
+
+  GAME_INFO[currentGame].inputs.forEach(input => {
+    const button = document.createElement("button");
+    button.className = "library-node";
+    button.textContent = "+ " + input;
+    button.onclick = () => addNode("input", input);
+    root.appendChild(button);
+  });
+
+  const outputs = document.createElement("div");
+  outputs.className = "node-category";
+  outputs.textContent = "AVAILABLE OUTPUTS";
+  root.appendChild(outputs);
+
+  GAME_INFO[currentGame].outputs.forEach(output => {
+    const button = document.createElement("button");
+    button.className = "library-node";
+    button.textContent = "+ " + output;
+    button.onclick = () => addNode("output", output);
+    root.appendChild(button);
+  });
+}
+
+function addNode(type, specific = "") {
+  const definition = NODE_TYPES[type];
+  const node = {
+    id: crypto.randomUUID(),
+    type,
+    label: specific || definition.label,
+    x: 50 + Math.random() * 120,
+    y: 50 + Math.random() * 120,
+    value: type === "number" ? 0 : "",
+    operation: ">"
+  };
+
+  nodes.push(node);
+  selectedNode = node.id;
+  renderNodes();
+}
+
+function renderNodes() {
+  const canvas = $("node-canvas");
+  canvas.querySelectorAll(".visual-node").forEach(n => n.remove());
+
+  $("empty-message").style.display = nodes.length ? "none" : "grid";
+
+  nodes.forEach(node => {
+    const definition = NODE_TYPES[node.type];
+    const element = document.createElement("div");
+    element.className = "visual-node" + (selectedNode === node.id ? " selected" : "");
+    element.style.left = node.x + "px";
+    element.style.top = node.y + "px";
+    element.dataset.id = node.id;
+
+    const header = document.createElement("div");
+    header.className = "node-header";
+    header.style.background = definition.color;
+    header.style.color = "#071018";
+    header.textContent = node.label;
+
+    const body = document.createElement("div");
+    body.className = "node-body";
+    body.textContent = definition.description;
+
+    if (node.type === "number" || node.type === "variable") {
+      const input = document.createElement("input");
+      input.value = node.value;
+      input.placeholder = "Value";
+      input.addEventListener("input", e => {
+        node.value = e.target.value;
+      });
+      body.appendChild(input);
+    }
+
+    if (node.type === "compare") {
+      const select = document.createElement("select");
+      [">", "<", "==", "!=", ">=", "<="].forEach(op => {
+        const option = document.createElement("option");
+        option.value = op;
+        option.textContent = op;
+        select.appendChild(option);
+      });
+      select.value = node.operation;
+      select.onchange = e => node.operation = e.target.value;
+      body.appendChild(select);
+    }
+
+    element.append(header, body);
+    element.addEventListener("mousedown", e => {
+      if (e.target.tagName === "INPUT" || e.target.tagName === "SELECT") return;
+      selectedNode = node.id;
+      dragging = {
+        id: node.id,
+        startX: e.clientX,
+        startY: e.clientY,
+        originalX: node.x,
+        originalY: node.y
+      };
+      renderProperties();
+      renderNodes();
+    });
+
+    element.addEventListener("click", () => {
+      selectedNode = node.id;
+      renderProperties();
+      renderNodes();
+    });
+
+    canvas.appendChild(element);
+  });
+
+  renderProperties();
+}
+
+window.addEventListener("mousemove", e => {
+  if (!dragging) return;
+  const node = nodes.find(n => n.id === dragging.id);
+  if (!node) return;
+
+  node.x = Math.max(0, dragging.originalX + e.clientX - dragging.startX);
+  node.y = Math.max(0, dragging.originalY + e.clientY - dragging.startY);
+
+  const element = document.querySelector(`[data-id="${node.id}"]`);
+  if (element) {
+    element.style.left = node.x + "px";
+    element.style.top = node.y + "px";
+  }
+});
+
+window.addEventListener("mouseup", () => dragging = null);
+
+function renderProperties() {
+  const root = $("properties-content");
+  root.innerHTML = "";
+
+  const node = nodes.find(n => n.id === selectedNode);
+
+  if (!node) {
+    root.textContent = "Sélectionne un bloc pour modifier ses paramètres.";
+    return;
+  }
+
+  const title = document.createElement("b");
+  title.textContent = node.label;
+
+  const description = document.createElement("p");
+  description.textContent = NODE_TYPES[node.type].description;
+
+  const remove = document.createElement("button");
+  remove.className = "secondary-button";
+  remove.textContent = "DELETE NODE";
+  remove.onclick = () => {
+    nodes = nodes.filter(n => n.id !== node.id);
+    selectedNode = null;
+    renderNodes();
+  };
+
+  root.append(title, description, remove);
+}
+
+function saveBot() {
+  const name = $("bot-name").value.trim() || "Unnamed Bot";
+  const bot = {
+    id: crypto.randomUUID(),
+    name,
+    game: currentGame,
+    nodes: structuredClone(nodes),
+    updated: new Date().toISOString()
+  };
+
+  savedBots = savedBots.filter(b => b.name !== name || b.game !== currentGame);
+  savedBots.push(bot);
+  localStorage.setItem("neonlab_bots", JSON.stringify(savedBots));
+  alert("Bot saved!");
+}
+
+function exportBot() {
+  const data = {
+    format: "NEONLAB_BOT",
+    version: 1,
+    game: currentGame,
+    name: $("bot-name").value,
+    nodes
+  };
+
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = "neonlab-bot.json";
+  a.click();
+  URL.revokeObjectURL(url);
+}
+
+function renderBots() {
+  const root = $("bot-list");
+  root.innerHTML = "";
+
+  if (!savedBots.length) {
+    root.textContent = "Aucun bot sauvegardé pour le moment.";
+    return;
+  }
+
+  savedBots.forEach(bot => {
+    const card = document.createElement("div");
+    card.className = "bot-item";
+
+    const title = document.createElement("b");
+    title.textContent = bot.name;
+
+    const description = document.createElement("p");
+    description.textContent = `${GAME_INFO[bot.game]?.name || bot.game} · ${bot.nodes.length} nodes`;
+
+    const edit = document.createElement("button");
+    edit.className = "secondary-button";
+    edit.textContent = "EDIT";
+    edit.onclick = () => {
+      $("editor-game").value = bot.game;
+      $("bot-name").value = bot.name;
+      currentGame = bot.game;
+      nodes = structuredClone(bot.nodes);
+      showPage("editor");
+    };
+
+    card.append(title, description, edit);
+    root.appendChild(card);
+  });
+}
+
+// Import sécurisé des bots JSON
+const importButton = document.createElement("input");
+importButton.type = "file";
+importButton.accept = ".json,application/json";
+importButton.hidden = true;
+document.body.appendChild(importButton);
+
+const importLabel = document.createElement("button");
+importLabel.className = "secondary-button";
+importLabel.textContent = "IMPORT BOT";
+importLabel.onclick = () => importButton.click();
+$("editor-game").parentElement.appendChild(importLabel);
+importLabel.after(importButton);
+
+importButton.addEventListener("change", async () => {
+  const file = importButton.files[0];
+  if (!file) return;
+
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.format !== "NEONLAB_BOT" || data.version !== 1) throw new Error("Format incompatible");
+    if (!GAME_INFO[data.game] || !Array.isArray(data.nodes)) throw new Error("Bot invalide");
+
+    currentGame = data.game;
+    $("editor-game").value = data.game;
+    $("bot-name").value = data.name || "Imported Bot";
+    nodes = data.nodes;
+    refreshEditor();
+    alert("Bot imported!");
+  } catch (error) {
+    alert("Import impossible : " + error.message);
+  }
+
+  importButton.value = "";
+});
+
+// =====================================================
+// GAMES
+// =====================================================
+
+function renderChess() {
+  $("game-container").innerHTML = `
+    <div class="arena-panel">
+      <h3>CHESS</h3>
+      <p>Le moteur d'échecs sera ajouté dans la prochaine partie.</p>
+    </div>`;
+}
+
+function renderConnect4() {
+  let board = Array.from({length: 6}, () => Array(7).fill(0));
+
+  $("game-container").innerHTML = `
+    <div style="text-align:center">
+      <h3>PUISSANCE 4</h3>
+      <p id="connect-status">À toi de jouer — jaune</p>
+      <div id="connect-board" style="display:grid;grid-template-columns:repeat(7,48px);gap:6px;justify-content:center;background:#1748a0;padding:12px;border-radius:12px;width:max-content;margin:20px auto"></div>
+      <button class="secondary-button" id="connect-reset">RESET</button>
+    </div>`;
+
+  const root = $("connect-board");
+  let turn = 1;
+  let finished = false;
+
+  function draw() {
+    root.innerHTML = "";
+    board.forEach((row, r) => row.forEach((value, c) => {
+      const cell = document.createElement("button");
+      cell.style.cssText = `width:48px;height:48px;border-radius:50%;border:0;background:${value === 1 ? "#ffd83d" : value === 2 ? "#ef5365" : "#091d48"};`;
+      cell.onclick = () => play(c);
+      root.appendChild(cell);
+    }));
+  }
+
+  function play(column) {
+    if (finished) return;
+    for (let r = 5; r >= 0; r--) {
+      if (!board[r][column]) {
+        board[r][column] = turn;
+        break;
+      }
+      if (r === 0) return;
+    }
+
+    draw();
+
+    if (checkWin(turn)) {
+      $("connect-status").textContent = turn === 1 ? "Jaune gagne !" : "Rouge gagne !";
+      finished = true;
+      return;
+    }
+
+    if (board.every(row => row.every(Boolean))) {
+      $("connect-status").textContent = "Match nul !";
+      finished = true;
+      return;
+    }
+
+    turn = turn === 1 ? 2 : 1;
+    $("connect-status").textContent = turn === 1 ? "À toi de jouer — jaune" : "Rouge joue";
+    if (turn === 2) setTimeout(() => {
+      const available = board[0].map((v, i) => v ? -1 : i).filter(i => i >= 0);
+      if (available.length) play(available[Math.floor(Math.random() * available.length)]);
+    }, 350);
+  }
+
+  function checkWin(player) {
+    const directions = [[0,1],[1,0],[1,1],[1,-1]];
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+      for (const [dr, dc] of directions) {
+        let count = 0;
+        for (let k = 0; k < 4; k++) {
+          const rr = r + dr*k, cc = c + dc*k;
+          if (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && board[rr][cc] === player) count++;
+        }
+        if (count === 4) return true;
+      }
+    }
+    return false;
+  }
+
+  $("connect-reset").onclick = () => {
+    board = Array.from({length: 6}, () => Array(7).fill(0));
+    turn = 1;
+    finished = false;
+    $("connect-status").textContent = "À toi de jouer — jaune";
+    draw();
+  };
+
+  draw();
+}
+
+function renderSnake() {
+  $("game-container").innerHTML = `
+    <div style="text-align:center">
+      <h3>SNAKE</h3>
+      <p>Utilise les flèches du clavier.</p>
+      <canvas id="snake-canvas" width="400" height="400" style="max-width:100%;background:#07130f;border:1px solid #35e6db;border-radius:8px"></canvas>
+      <p id="snake-score">Score : 0</p>
+      <button class="primary-button" id="snake-start">START / RESTART</button>
+    </div>`;
+
+  const canvas = $("snake-canvas");
+  const ctx = canvas.getContext("2d");
+  const size = 20;
+  let snake, food, direction, score, timer, running;
+
+  function start() {
+    clearInterval(timer);
+    snake = [{x:10,y:10},{x:9,y:10},{x:8,y:10}];
+    food = {x:15,y:10};
+    direction = {x:1,y:0};
+    score = 0;
+    running = true;
+    $("snake-score").textContent = "Score : 0";
+    draw();
+    timer = setInterval(step, 110);
+  }
+
+  function draw() {
+    ctx.fillStyle = "#07130f";
+    ctx.fillRect(0,0,400,400);
+    ctx.fillStyle = "#35e6db";
+    snake.forEach(p => ctx.fillRect(p.x*size+2,p.y*size+2,16,16));
+    ctx.fillStyle = "#ff526d";
+    ctx.fillRect(food.x*size+2,food.y*size+2,16,16);
+  }
+
+  function step() {
+    if (!running) return;
+    const head = {x:snake[0].x+direction.x,y:snake[0].y+direction.y};
+    if (head.x<0 || head.x>=20 || head.y<0 || head.y>=20 || snake.some(p=>p.x===head.x&&p.y===head.y)) {
+      running = false;
+      clearInterval(timer);
+      $("snake-score").textContent = `Game Over — Score : ${score}`;
+      return;
+    }
+
+    snake.unshift(head);
+    if (head.x===food.x && head.y===food.y) {
+      score++;
+      $("snake-score").textContent = `Score : ${score}`;
+      food = {x:Math.floor(Math.random()*20),y:Math.floor(Math.random()*20)};
+    } else snake.pop();
+
+    draw();
+  }
+
+  document.onkeydown = e => {
+    const dirs = {
+      ArrowUp:{x:0,y:-1},
+      ArrowDown:{x:0,y:1},
+      ArrowLeft:{x:-1,y:0},
+      ArrowRight:{x:1,y:0}
+    };
+    const next = dirs[e.key];
+    if (next && next.x !== -direction.x && next.y !== -direction.y) {
+      direction = next;
+      e.preventDefault();
+    }
+  };
+
+  $("snake-start").onclick = start;
+  start();
+}
+
+function renderPingPong() {
+  $("game-container").innerHTML = `
+    <div style="text-align:center">
+      <h3>3D PING PONG</h3>
+      <p>Prototype 3D à venir : table, balle, raquettes et physique.</p>
+      <div id="three-ping" style="height:350px;background:#071018;border-radius:10px"></div>
+    </div>`;
+
+  if (!window.THREE) return;
+  const host = $("three-ping");
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x071018);
+  const camera = new THREE.PerspectiveCamera(55, host.clientWidth/350, .1, 100);
+  camera.position.set(0,5,9);
+  camera.lookAt(0,0,0);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(host.clientWidth,350);
+  host.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x334455,2));
+
+  const table = new THREE.Mesh(
+    new THREE.BoxGeometry(5,.2,2.8),
+    new THREE.MeshStandardMaterial({color:0x176b9a})
+  );
+  scene.add(table);
+
+  const net = new THREE.Mesh(
+    new THREE.BoxGeometry(5,.35,.06),
+    new THREE.MeshStandardMaterial({color:0xffffff})
+  );
+  net.position.y=.25;
+  scene.add(net);
+
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(.13,20,20),
+    new THREE.MeshStandardMaterial({color:0xffe14a})
+  );
+  ball.position.set(0,1,0);
+  scene.add(ball);
+
+  let t = 0;
+  function animate() {
+    if (!host.isConnected) {
+      renderer.dispose();
+      return;
+    }
+    requestAnimationFrame(animate);
+    t += .025;
+    ball.position.set(Math.sin(t)*1.7, .8+Math.abs(Math.sin(t*2))*.8, Math.cos(t)*.8);
+    renderer.render(scene,camera);
+  }
+  animate();
+}
+
+function renderRacing() {
+  $("game-container").innerHTML = `
+    <div style="text-align:center">
+      <h3>RACING AI</h3>
+      <p>Prototype de circuit généré aléatoirement à venir.</p>
+      <div id="three-racing" style="height:350px;background:#071018;border-radius:10px"></div>
+    </div>`;
+
+  if (!window.THREE) return;
+  const host = $("three-racing");
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x182b26);
+
+  const camera = new THREE.PerspectiveCamera(60,host.clientWidth/350,.1,100);
+  camera.position.set(0,12,15);
+  camera.lookAt(0,0,0);
+
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setSize(host.clientWidth,350);
+  host.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x334433,2));
+
+  const ground = new THREE.Mesh(
+    new THREE.PlaneGeometry(60,60),
+    new THREE.MeshStandardMaterial({color:0x28603e})
+  );
+  ground.rotation.x=-Math.PI/2;
+  scene.add(ground);
+
+  const track = new THREE.Mesh(
+    new THREE.RingGeometry(7,13,64),
+    new THREE.MeshStandardMaterial({color:0x333a45,side:THREE.DoubleSide})
+  );
+  track.rotation.x=-Math.PI/2;
+  track.position.y=.05;
+  scene.add(track);
+
+  function makeCar(color,x,z) {
+    const car = new THREE.Mesh(
+      new THREE.BoxGeometry(1.1,.5,2),
+      new THREE.MeshStandardMaterial({color})
+    );
+    car.position.set(x,.4,z);
+    scene.add(car);
+  }
+
+  makeCar(0x35e6db,0,-9);
+  makeCar(0xff536f,3,-9);
+
+  const animate=()=>{
+    if(!host.isConnected){renderer.dispose();return;}
+    requestAnimationFrame(animate);
+    renderer.render(scene,camera);
+  };
+  animate();
+}
+
+// Initialisation
+renderNodeLibrary();
+renderNodes();
+showPage("games");
