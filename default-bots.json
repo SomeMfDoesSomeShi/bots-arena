@@ -1,68 +1,43 @@
+
 {
-  "format": "Game AI Lab default bot pack",
-  "version": 1,
-  "bots": {
-    "chess": [
-      {
-        "name": "Rookie",
-        "difficulty": "easy",
-        "strategy": "random"
-      },
-      {
-        "name": "Tactician",
-        "difficulty": "medium",
-        "strategy": "captures, checks, development"
-      },
-      {
-        "name": "Grandmaster",
-        "difficulty": "hard",
-        "strategy": "material evaluation"
-      }
-    ],
-    "connect": [
-      {
-        "name": "Dropper",
-        "difficulty": "easy",
-        "strategy": "random legal column"
-      },
-      {
-        "name": "Blocker",
-        "difficulty": "medium",
-        "strategy": "win or block, center preference"
-      },
-      {
-        "name": "Four Seeker",
-        "difficulty": "hard",
-        "strategy": "win or block, center preference"
-      }
-    ],
-    "pong": [
-      {
-        "name": "Wobbler",
-        "difficulty": "easy"
-      },
-      {
-        "name": "Rally",
-        "difficulty": "medium"
-      },
-      {
-        "name": "Wall Reader",
-        "difficulty": "hard"
-      }
-    ],
-    "race": [
-      {
-        "name": "Sunday Driver",
-        "difficulty": "easy"
-      },
-      {
-        "name": "Lane Picker",
-        "difficulty": "medium"
-      },
-      {
-        "name": "Apex",
-        "difficulty": "hard"
-      }
-    ]
-  }
+  "format": "NEONLAB_DEFAULT_BOTS",
+  "version": 2,
+  "bots": [
+    {
+      "name": "Connect Four - Center",
+      "game": "connect4",
+      "description": "Privilégie le centre du plateau.",
+      "strategy": "connect4-center"
+    },
+    {
+      "name": "Connect Four - Tactical",
+      "game": "connect4",
+      "description": "Cherche une victoire immédiate, puis bloque l'adversaire.",
+      "strategy": "connect4-tactical"
+    },
+    {
+      "name": "Snake - Food Seeker",
+      "game": "snake",
+      "description": "Se dirige vers la nourriture en évitant les collisions.",
+      "strategy": "snake-food"
+    },
+    {
+      "name": "Racing - Safe Driver",
+      "game": "racing",
+      "description": "Réduit sa vitesse quand un obstacle approche.",
+      "strategy": "racing-safe"
+    },
+    {
+      "name": "Ping Pong - Tracker",
+      "game": "pingpong",
+      "description": "Suit la position de la balle.",
+      "strategy": "pong-tracker"
+    },
+    {
+      "name": "Chess - Random Legal",
+      "game": "chess",
+      "description": "Choisit parmi les coups légaux.",
+      "strategy": "chess-random"
+    }
+  ]
 }
