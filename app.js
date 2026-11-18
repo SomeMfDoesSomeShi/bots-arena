@@ -1,82 +1,75 @@
 
 "use strict";
 
-/* ============================================================
-   NEONLAB — APP.JS
-   Visual node editor + graph interpreter + game engines
-   ============================================================ */
+/* =========================================================
+   BOTS ARENA 2.0
+   Visual graph editor + game engines
+   ========================================================= */
 
 const $ = id => document.getElementById(id);
+const STORAGE_KEY = "bots_arena_user_bots_v2";
 
-const STORAGE_KEY = "neonlab_bots";
-const BOT_FORMAT = "NEONLAB_BOT";
-const BOT_VERSION = 2;
-
-const GAME_INFO = {
+const GAMES = {
   chess: {
-    name: "Chess",
+    name: "Chess", icon: "♟", category: "STRATEGY",
+    description: "Échecs classiques contre un bot programmable.",
     inputs: [
-      ["legalMoves", "Legal Moves", "list"],
-      ["currentTurn", "Current Turn", "number"],
-      ["isCheck", "Is Check", "boolean"],
-      ["whitePieces", "White Pieces", "number"],
-      ["blackPieces", "Black Pieces", "number"],
-      ["moveCount", "Move Count", "number"],
-      ["board", "Board", "list"]
-    ],
-    outputs: [
-      ["move", "Choose Move", "text"]
-    ]
-  },
-
-  connect4: {
-    name: "Puissance 4",
-    inputs: [
-      ["availableColumns", "Available Columns", "list"],
-      ["currentPlayer", "Current Player", "number"],
+      ["legalMoveCount", "Legal move count", "number"],
+      ["legalMoves", "Legal moves", "list"],
+      ["currentTurn", "Current turn", "text"],
+      ["isCheck", "Is check", "boolean"],
+      ["isCheckmate", "Is checkmate", "boolean"],
       ["board", "Board", "list"],
-      ["centerColumn", "Center Column", "number"],
-      ["winningMoves", "Winning Moves", "list"],
-      ["opponentThreats", "Opponent Threats", "list"]
+      ["myKingX", "My king X", "number"],
+      ["myKingY", "My king Y", "number"]
     ],
-    outputs: [
-      ["column", "Choose Column", "number"]
-    ]
+    outputs: [["moveIndex", "Move index", "number"]]
   },
-
-  pingpong: {
-    name: "3D Ping Pong",
+  connect4: {
+    name: "Puissance 4", icon: "🟡", category: "STRATEGY",
+    description: "Aligne quatre jetons avant ton adversaire.",
     inputs: [
-      ["ballX", "Ball Position X", "number"],
-      ["ballY", "Ball Position Y", "number"],
-      ["ballZ", "Ball Position Z", "number"],
-      ["ballVelocityX", "Ball Velocity X", "number"],
-      ["ballVelocityY", "Ball Velocity Y", "number"],
-      ["ballVelocityZ", "Ball Velocity Z", "number"],
-      ["paddleX", "Paddle Position X", "number"],
-      ["paddleY", "Paddle Position Y", "number"],
-      ["ballApproaching", "Ball Approaching", "boolean"]
+      ["availableColumns", "Available columns", "list"],
+      ["board", "Board", "list"],
+      ["currentPlayer", "Current player", "number"],
+      ["winningColumns", "Winning columns", "list"],
+      ["opponentThreats", "Opponent threats", "number"]
+    ],
+    outputs: [["column", "Choose column", "number"]]
+  },
+  pingpong: {
+    name: "3D Ping Pong", icon: "🏓", category: "3D PHYSICS",
+    description: "Contrôle une raquette dans un environnement 3D.",
+    inputs: [
+      ["ballX", "Ball X", "number"],
+      ["ballY", "Ball Y", "number"],
+      ["ballZ", "Ball Z", "number"],
+      ["ballVelocityX", "Ball velocity X", "number"],
+      ["ballVelocityY", "Ball velocity Y", "number"],
+      ["ballVelocityZ", "Ball velocity Z", "number"],
+      ["paddleX", "Paddle X", "number"],
+      ["paddleY", "Paddle Y", "number"],
+      ["ballApproaching", "Ball approaching", "boolean"]
     ],
     outputs: [
-      ["targetX", "Paddle Target X", "number"],
-      ["targetY", "Paddle Target Y", "number"],
-      ["serve", "Serve", "boolean"]
+      ["paddleTargetX", "Paddle target X", "number"],
+      ["paddleTargetY", "Paddle target Y", "number"]
     ]
   },
-
   racing: {
-    name: "Racing AI",
+    name: "Racing AI", icon: "🏎️", category: "SIMULATION",
+    description: "Pilote sur un circuit généré aléatoirement.",
     inputs: [
       ["speed", "Speed", "number"],
-      ["front", "Front Distance", "number"],
-      ["frontLeft", "Front Left Distance", "number"],
-      ["frontRight", "Front Right Distance", "number"],
-      ["left", "Left Distance", "number"],
-      ["right", "Right Distance", "number"],
-      ["rear", "Rear Distance", "number"],
-      ["opponentDistance", "Opponent Distance", "number"],
+      ["frontDistance", "Front distance", "number"],
+      ["frontLeftDistance", "Front-left distance", "number"],
+      ["frontRightDistance", "Front-right distance", "number"],
+      ["leftDistance", "Left distance", "number"],
+      ["rightDistance", "Right distance", "number"],
+      ["rearDistance", "Rear distance", "number"],
       ["heading", "Heading", "number"],
-      ["curve", "Curve Direction", "number"]
+      ["trackDirection", "Track direction", "number"],
+      ["opponentDistance", "Opponent distance", "number"]
     ],
     outputs: [
       ["throttle", "Throttle", "number"],
@@ -84,2773 +77,1956 @@ const GAME_INFO = {
       ["steering", "Steering", "number"]
     ]
   },
-
   snake: {
-    name: "Snake",
+    name: "Snake", icon: "🐍", category: "ARCADE",
+    description: "Dirige le serpent et récupère la nourriture.",
     inputs: [
       ["headX", "Head X", "number"],
       ["headY", "Head Y", "number"],
       ["foodX", "Food X", "number"],
       ["foodY", "Food Y", "number"],
-      ["distanceFood", "Distance To Food", "number"],
-      ["wallFront", "Wall Front", "number"],
-      ["wallLeft", "Wall Left", "number"],
-      ["wallRight", "Wall Right", "number"],
-      ["body", "Body Positions", "list"],
-      ["availableDirections", "Available Directions", "list"]
+      ["direction", "Current direction", "number"],
+      ["body", "Body positions", "list"],
+      ["availableDirections", "Available directions", "list"]
     ],
-    outputs: [
-      ["direction", "Choose Direction", "text"]
-    ]
+    outputs: [["direction", "Choose direction", "number"]]
   }
 };
 
-/* ============================================================
-   NODE DEFINITIONS
-   ============================================================ */
-
-const NODE_TYPES = {
+const NODE_DEFS = {
   event: {
-    label: "START / EVENT",
-    category: "EVENTS",
-    color: "#8b68ff",
-    description: "Déclenche l'exécution du bot.",
-    ports: [
-      {id:"next", label:"Then", direction:"out", type:"exec"}
-    ]
+    label: "START / EVENT", category: "EVENTS", color: "#e5e7eb",
+    description: "Déclenche le programme à chaque décision.",
+    outputs: [["next", "Next", "exec"]]
   },
-
-  gameInputs: {
-    label: "GAME INPUTS",
-    category: "GAME",
-    color: "#278eae",
-    description: "Contient tous les capteurs et informations du jeu."
+  inputs: {
+    label: "GAME INPUTS", category: "GAME", color: "#369bc0",
+    description: "Toutes les données disponibles du jeu.",
+    dynamic: "gameInputs"
   },
-
-  gameOutputs: {
-    label: "GAME OUTPUTS",
-    category: "GAME",
-    color: "#39b98d",
-    description: "Contient toutes les commandes disponibles pour le jeu."
+  outputs: {
+    label: "GAME OUTPUTS", category: "GAME", color: "#36b98d",
+    description: "Les commandes envoyées au jeu.",
+    dynamic: "gameOutputs"
   },
-
   number: {
-    label: "NUMBER",
-    category: "VALUES",
-    color: "#4d9ce0",
+    label: "NUMBER", category: "VALUES", color: "#438fe0",
     description: "Une valeur numérique.",
-    ports: [
-      {id:"value",label:"Value",direction:"out",type:"number"}
-    ]
+    outputs: [["value", "Value", "number"]]
   },
-
   boolean: {
-    label: "BOOLEAN",
-    category: "VALUES",
-    color: "#4d9ce0",
+    label: "BOOLEAN", category: "VALUES", color: "#438fe0",
     description: "Une valeur vraie ou fausse.",
-    ports: [
-      {id:"value",label:"Value",direction:"out",type:"boolean"}
-    ]
+    outputs: [["value", "Value", "boolean"]]
   },
-
   text: {
-    label: "TEXT",
-    category: "VALUES",
-    color: "#4d9ce0",
-    description: "Une valeur textuelle.",
-    ports: [
-      {id:"value",label:"Value",direction:"out",type:"text"}
-    ]
+    label: "TEXT", category: "VALUES", color: "#438fe0",
+    description: "Une chaîne de caractères.",
+    outputs: [["value", "Value", "text"]]
   },
-
   math: {
-    label: "MATH",
-    category: "MATH",
-    color: "#d29c49",
-    description: "Effectue un calcul.",
-    ports: [
-      {id:"a",label:"A",direction:"in",type:"number"},
-      {id:"b",label:"B",direction:"in",type:"number"},
-      {id:"result",label:"Result",direction:"out",type:"number"}
-    ]
+    label: "MATH", category: "MATH", color: "#bd8b42",
+    description: "Effectue une opération mathématique.",
+    inputs: [["a", "A", "number"], ["b", "B", "number"]],
+    outputs: [["value", "Result", "number"]]
   },
-
   compare: {
-    label: "COMPARE",
-    category: "LOGIC",
-    color: "#d29c49",
+    label: "COMPARISON", category: "LOGIC", color: "#d19a47",
     description: "Compare deux valeurs.",
-    ports: [
-      {id:"a",label:"A",direction:"in",type:"any"},
-      {id:"b",label:"B",direction:"in",type:"any"},
-      {id:"result",label:"Result",direction:"out",type:"boolean"}
-    ]
+    inputs: [["a", "A", "number"], ["b", "B", "number"]],
+    outputs: [["result", "Result", "boolean"]]
   },
-
   logic: {
-    label: "AND / OR",
-    category: "LOGIC",
-    color: "#d29c49",
-    description: "Combine deux conditions.",
-    ports: [
-      {id:"a",label:"A",direction:"in",type:"boolean"},
-      {id:"b",label:"B",direction:"in",type:"boolean"},
-      {id:"result",label:"Result",direction:"out",type:"boolean"}
-    ]
+    label: "LOGIC", category: "LOGIC", color: "#d19a47",
+    description: "Effectue une opération logique.",
+    inputs: [["a", "A", "boolean"], ["b", "B", "boolean"]],
+    outputs: [["result", "Result", "boolean"]]
   },
-
-  not: {
-    label: "NOT",
-    category: "LOGIC",
-    color: "#d29c49",
-    description: "Inverse une condition.",
-    ports: [
-      {id:"a",label:"Input",direction:"in",type:"boolean"},
-      {id:"result",label:"Result",direction:"out",type:"boolean"}
-    ]
+  if: {
+    label: "IF / ELSE", category: "LOGIC", color: "#d19a47",
+    description: "Choisit une valeur selon une condition.",
+    inputs: [
+      ["condition", "Condition", "boolean"],
+      ["yes", "If true", "any"],
+      ["no", "If false", "any"]
+    ],
+    outputs: [["result", "Result", "any"]]
   },
-
-  condition: {
-    label: "IF / ELSE",
-    category: "FLOW",
-    color: "#d29c49",
-    description: "Choisit une branche selon une condition.",
-    ports: [
-      {id:"execIn",label:"Execute",direction:"in",type:"exec"},
-      {id:"condition",label:"Condition",direction:"in",type:"boolean"},
-      {id:"true",label:"True",direction:"out",type:"exec"},
-      {id:"false",label:"False",direction:"out",type:"exec"}
-    ]
-  },
-
-  setVariable: {
-    label: "SET VARIABLE",
-    category: "VARIABLES",
-    color: "#b47be9",
-    description: "Enregistre une valeur dans une variable.",
-    ports: [
-      {id:"execIn",label:"Execute",direction:"in",type:"exec"},
-      {id:"value",label:"Value",direction:"in",type:"any"},
-      {id:"next",label:"Then",direction:"out",type:"exec"}
-    ]
-  },
-
-  getVariable: {
-    label: "GET VARIABLE",
-    category: "VARIABLES",
-    color: "#b47be9",
-    description: "Récupère la valeur d'une variable.",
-    ports: [
-      {id:"value",label:"Value",direction:"out",type:"any"}
-    ]
-  },
-
   random: {
-    label: "RANDOM",
-    category: "MATH",
-    color: "#d29c49",
+    label: "RANDOM", category: "MATH", color: "#bd8b42",
     description: "Génère un nombre aléatoire.",
-    ports: [
-      {id:"min",label:"Min",direction:"in",type:"number"},
-      {id:"max",label:"Max",direction:"in",type:"number"},
-      {id:"result",label:"Result",direction:"out",type:"number"}
-    ]
+    inputs: [["min", "Minimum", "number"], ["max", "Maximum", "number"]],
+    outputs: [["value", "Value", "number"]]
   },
-
+  clamp: {
+    label: "CLAMP", category: "MATH", color: "#bd8b42",
+    description: "Limite une valeur entre deux bornes.",
+    inputs: [
+      ["value", "Value", "number"],
+      ["min", "Minimum", "number"],
+      ["max", "Maximum", "number"]
+    ],
+    outputs: [["result", "Result", "number"]]
+  },
+  variable: {
+    label: "VARIABLE", category: "VARIABLES", color: "#a77be7",
+    description: "Stocke une valeur ou récupère sa valeur.",
+    inputs: [["value", "Value", "any"]],
+    outputs: [["result", "Stored value", "any"]]
+  },
   listLength: {
-    label: "LIST LENGTH",
-    category: "LISTS",
-    color: "#d29c49",
+    label: "LIST LENGTH", category: "LISTS", color: "#3ab88c",
     description: "Retourne le nombre d'éléments d'une liste.",
-    ports: [
-      {id:"list",label:"List",direction:"in",type:"list"},
-      {id:"length",label:"Length",direction:"out",type:"number"}
-    ]
+    inputs: [["list", "List", "list"]],
+    outputs: [["length", "Length", "number"]]
   },
-
   listGet: {
-    label: "LIST GET",
-    category: "LISTS",
-    color: "#d29c49",
-    description: "Récupère un élément d'une liste.",
-    ports: [
-      {id:"list",label:"List",direction:"in",type:"list"},
-      {id:"index",label:"Index",direction:"in",type:"number"},
-      {id:"value",label:"Value",direction:"out",type:"any"}
-    ]
-  },
-
-  repeat: {
-    label: "REPEAT",
-    category: "FLOW",
-    color: "#d29c49",
-    description: "Répète une séquence un nombre défini de fois.",
-    ports: [
-      {id:"execIn",label:"Execute",direction:"in",type:"exec"},
-      {id:"count",label:"Count",direction:"in",type:"number"},
-      {id:"body",label:"Loop",direction:"out",type:"exec"},
-      {id:"next",label:"Then",direction:"out",type:"exec"}
-    ]
+    label: "LIST GET", category: "LISTS", color: "#3ab88c",
+    description: "Récupère un élément à un index donné.",
+    inputs: [["list", "List", "list"], ["index", "Index", "number"]],
+    outputs: [["value", "Value", "any"]]
   }
 };
 
-/* ============================================================
-   APPLICATION STATE
-   ============================================================ */
-
+let currentPage = "games";
 let currentGame = "chess";
-let selectedGame = "chess";
-let nodes = [];
-let connections = [];
-let selectedNode = null;
+let selectedNodeId = null;
 let pendingPort = null;
-let dragging = null;
-let savedBots = loadSavedBots();
-let gameRuntime = null;
-let gameAnimation = null;
+let graph = { nodes: [], connections: [] };
+let userBots = loadUserBots();
+let defaultBots = {};
+let gameCleanup = null;
+let activeBotId = null;
+let dragState = null;
+let currentGameSession = null;
 
-function uid() {
-  return "n_" + Math.random().toString(36).slice(2) + Date.now().toString(36);
-}
+/* =========================================================
+   STORAGE / NAVIGATION
+   ========================================================= */
 
-function loadSavedBots() {
+function loadUserBots() {
   try {
-    const data = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
-    return Array.isArray(data) ? data : [];
+    const value = JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]");
+    return Array.isArray(value) ? value : [];
   } catch {
     return [];
   }
 }
 
-function persistBots() {
-  localStorage.setItem(STORAGE_KEY, JSON.stringify(savedBots));
+function saveUserBotsStorage() {
+  localStorage.setItem(STORAGE_KEY, JSON.stringify(userBots));
 }
-
-function deepClone(value) {
-  return JSON.parse(JSON.stringify(value));
-}
-
-/* ============================================================
-   INJECTED EDITOR STYLES
-   ============================================================ */
-
-(function injectEditorStyles() {
-  const style = document.createElement("style");
-  style.textContent = `
-    .visual-node {
-      min-width:190px;
-      width:210px;
-      overflow:visible;
-      user-select:none;
-    }
-
-    .visual-node .node-header {
-      min-height:32px;
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      gap:8px;
-      cursor:grab;
-    }
-
-    .visual-node .node-header:active {
-      cursor:grabbing;
-    }
-
-    .node-body {
-      display:flex;
-      flex-direction:column;
-      gap:5px;
-      padding:9px 7px;
-    }
-
-    .node-port-row {
-      display:flex;
-      align-items:center;
-      justify-content:space-between;
-      min-height:23px;
-      gap:8px;
-      font-size:10px;
-      color:#c5cee1;
-    }
-
-    .node-port-row.input {
-      justify-content:flex-start;
-    }
-
-    .node-port-row.output {
-      justify-content:flex-end;
-    }
-
-    .node-port {
-      width:13px;
-      height:13px;
-      min-width:13px;
-      border:2px solid #dce6f7;
-      border-radius:50%;
-      background:#101725;
-      padding:0;
-      cursor:crosshair;
-      position:relative;
-      z-index:5;
-    }
-
-    .node-port[data-type="number"] { border-color:#4d9ce0; }
-    .node-port[data-type="boolean"] { border-color:#e2ad50; }
-    .node-port[data-type="text"] { border-color:#bd83ed; }
-    .node-port[data-type="list"] { border-color:#43c7a0; }
-    .node-port[data-type="exec"] {
-      border-radius:3px;
-      transform:rotate(45deg);
-      border-color:#f4f4f4;
-    }
-
-    .node-port.pending {
-      background:#35e6db;
-      box-shadow:0 0 12px #35e6db;
-    }
-
-    .node-port.connected {
-      background:currentColor;
-    }
-
-    .node-setting {
-      width:100%;
-      margin:5px 0;
-      font-size:10px;
-    }
-
-    .node-inline-label {
-      font-size:9px;
-      color:#8996af;
-      margin-top:4px;
-    }
-
-    .wire {
-      fill:none;
-      stroke-width:3;
-      pointer-events:stroke;
-      cursor:pointer;
-      opacity:.85;
-    }
-
-    .wire.data { stroke:#35e6db; }
-    .wire.exec { stroke:#f1f3fa; stroke-dasharray:7 5; }
-    .wire:hover { stroke:#ffffff; stroke-width:5; }
-    .wire.pending { stroke:#35e6db; stroke-width:2; stroke-dasharray:4 5; }
-
-    #connections {
-      overflow:visible;
-      z-index:1;
-    }
-
-    .visual-node { z-index:2; }
-
-    .connection-hint {
-      color:#35e6db;
-    }
-
-    .node-property-field {
-      display:block;
-      width:100%;
-      margin:8px 0;
-      font-size:11px;
-    }
-
-    .game-board {
-      display:grid;
-      grid-template-columns:repeat(7, minmax(32px,52px));
-      gap:6px;
-      justify-content:center;
-      background:#1748a0;
-      padding:12px;
-      width:max-content;
-      max-width:100%;
-      margin:20px auto;
-      border-radius:12px;
-    }
-
-    .connect-cell {
-      width:100%;
-      aspect-ratio:1;
-      border:0;
-      border-radius:50%;
-      background:#091d48;
-    }
-
-    .connect-cell.p1 { background:#ffd83d; }
-    .connect-cell.p2 { background:#ef5365; }
-
-    .game-controls {
-      display:flex;
-      flex-wrap:wrap;
-      justify-content:center;
-      align-items:center;
-      gap:10px;
-      margin:15px;
-    }
-
-    .game-status {
-      color:#35e6db;
-      text-align:center;
-      min-height:24px;
-    }
-
-    .game-canvas {
-      display:block;
-      max-width:100%;
-      margin:auto;
-      border-radius:10px;
-      background:#071018;
-    }
-
-    .test-result {
-      margin-top:15px;
-      padding:12px;
-      border:1px solid var(--border);
-      border-radius:8px;
-      color:var(--muted);
-      font-size:12px;
-    }
-
-    .tiny-button {
-      padding:5px 8px;
-      border:1px solid var(--border);
-      background:#171d2b;
-      color:#ccd5e8;
-      border-radius:5px;
-      font-size:9px;
-      cursor:pointer;
-    }
-
-    .node-library .library-node {
-      text-align:left;
-    }
-  `;
-  document.head.appendChild(style);
-})();
-
-/* ============================================================
-   NAVIGATION
-   ============================================================ */
 
 function showPage(page) {
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
+  if (gameCleanup) {
+    gameCleanup();
+    gameCleanup = null;
+  }
 
+  currentPage = page;
+  document.querySelectorAll(".page").forEach(el => el.classList.remove("active"));
   const target = $(page + "-page");
   if (target) target.classList.add("active");
 
-  document.querySelectorAll(".nav-button").forEach(button => {
-    button.classList.toggle("active", button.dataset.page === page);
+  document.querySelectorAll(".nav").forEach(el => {
+    el.classList.toggle("active", el.dataset.page === page);
   });
 
   const titles = {
-    games:"Game Library",
-    bots:"My Bots",
-    editor:"Visual Bot Editor",
-    arena:"Bot Arena"
+    games: "Game library",
+    editor: "Bot editor",
+    bots: "My bots",
+    arena: "Bot arena"
   };
+  $("page-title").textContent = titles[page] || "Game session";
 
-  if ($("page-title")) {
-    $("page-title").textContent = titles[page] || "Game Session";
-  }
-
-  if (page === "bots") renderBots();
-  if (page === "editor") refreshEditor();
+  if (page === "bots") renderBotList();
+  if (page === "editor") renderEditor();
 }
 
-document.querySelectorAll(".nav-button").forEach(button => {
+document.querySelectorAll(".nav").forEach(button => {
   button.addEventListener("click", () => showPage(button.dataset.page));
 });
 
-function openEditorForGame() {
-  $("editor-game").value = selectedGame;
-  currentGame = selectedGame;
-  showPage("editor");
+function renderGameLibrary() {
+  $("game-grid").innerHTML = "";
+  Object.entries(GAMES).forEach(([id, game]) => {
+    const card = document.createElement("article");
+    card.className = "game-card";
+    card.innerHTML = `
+      <div class="game-art ${id}">${game.icon}</div>
+      <div class="game-info">
+        <span class="tag">${game.category}</span>
+        <h3>${game.name}</h3>
+        <p>${game.description}</p>
+        <button>OPEN GAME →</button>
+      </div>`;
+    card.addEventListener("click", () => openGame(id));
+    $("game-grid").appendChild(card);
+  });
 }
 
-function newBot() {
-  nodes = [];
-  connections = [];
-  selectedNode = null;
-  currentGame = $("editor-game").value || "chess";
-  $("bot-name").value = "New Bot";
-  showPage("editor");
+function openGame(game) {
+  currentGame = game;
+  $("game-title").textContent = GAMES[game].name.toUpperCase();
+  $("game-page").classList.add("active");
+  document.querySelectorAll(".page:not(#game-page)").forEach(p => p.classList.remove("active"));
+  document.querySelectorAll(".nav").forEach(n => n.classList.remove("active"));
+  buildGameOptions(game);
+  startGame(game);
 }
 
-/* ============================================================
-   NODE PORT DEFINITIONS
-   ============================================================ */
+function buildGameOptions(game) {
+  const options = $("game-options");
+  options.innerHTML = "";
 
-function getPorts(node) {
-  const game = GAME_INFO[currentGame];
+  const label = document.createElement("label");
+  label.textContent = "BOT : ";
+  const select = document.createElement("select");
+  select.id = "active-bot-select";
 
-  if (node.type === "gameInputs") {
-    return game.inputs.map(([id,label,type]) => ({
-      id,
-      label,
-      type,
-      direction:"out"
-    }));
-  }
+  const builtIn = document.createElement("option");
+  builtIn.value = "default";
+  builtIn.textContent = "Built-in bot";
+  select.appendChild(builtIn);
 
-  if (node.type === "gameOutputs") {
-    return [
-      {id:"execIn",label:"Execute",type:"exec",direction:"in"},
-      ...game.outputs.map(([id,label,type]) => ({
-        id,label,type,direction:"in"
-      }))
-    ];
-  }
-
-  if (node.type === "getVariable") {
-    return [{
-      id:"value",
-      label:node.config.name || "Value",
-      type:"any",
-      direction:"out"
-    }];
-  }
-
-  return NODE_TYPES[node.type]?.ports || [];
-}
-
-function getPort(nodeId, portId) {
-  const node = nodes.find(n => n.id === nodeId);
-  if (!node) return null;
-  return getPorts(node).find(p => p.id === portId) || null;
-}
-
-function compatibleTypes(a, b) {
-  if (a === "any" || b === "any") return true;
-  return a === b;
-}
-
-/* ============================================================
-   EDITOR INITIALISATION
-   ============================================================ */
-
-function refreshEditor() {
-  currentGame = $("editor-game").value;
-  $("workspace-game").textContent = GAME_INFO[currentGame].name.toUpperCase();
-
-  renderNodeLibrary();
-  renderNodes();
-  updateConnectionHint();
-}
-
-$("editor-game").addEventListener("change", () => {
-  currentGame = $("editor-game").value;
-  nodes = [];
-  connections = [];
-  selectedNode = null;
-  pendingPort = null;
-  refreshEditor();
-});
-
-function renderNodeLibrary() {
-  const root = $("node-library-content");
-  root.innerHTML = "";
-
-  const groups = {};
-
-  Object.entries(NODE_TYPES).forEach(([key, def]) => {
-    if (!groups[def.category]) groups[def.category] = [];
-    groups[def.category].push([key,def]);
+  userBots.filter(b => b.game === game).forEach(bot => {
+    const option = document.createElement("option");
+    option.value = bot.id;
+    option.textContent = bot.name;
+    select.appendChild(option);
   });
 
-  Object.entries(groups).forEach(([category, entries]) => {
+  if (activeBotId && userBots.some(b => b.id === activeBotId && b.game === game)) {
+    select.value = activeBotId;
+  }
+
+  select.addEventListener("change", () => {
+    activeBotId = select.value === "default" ? null : select.value;
+    if (currentGameSession?.restart) currentGameSession.restart();
+  });
+
+  label.appendChild(select);
+  options.appendChild(label);
+
+  const help = document.createElement("span");
+  help.className = "muted";
+  help.textContent = game === "snake"
+    ? "Snake : joue manuellement ou active le bot."
+    : "Tu joues contre le bot.";
+  options.appendChild(help);
+}
+
+function getActiveBot(game) {
+  const selected = $("active-bot-select")?.value;
+  if (selected && selected !== "default") {
+    const bot = userBots.find(b => b.id === selected && b.game === game);
+    if (bot) return bot;
+  }
+  return defaultBots[game] || null;
+}
+
+function runActiveBot(game, context) {
+  const bot = getActiveBot(game);
+  if (!bot?.graph) return {};
+  try {
+    return executeGraph(bot.graph, context, game);
+  } catch (error) {
+    console.warn("Bot execution error:", error);
+    return {};
+  }
+}
+
+/* =========================================================
+   NODE GRAPH EDITOR
+   ========================================================= */
+
+function makeNode(type, x = 300, y = 200, config = {}) {
+  return {
+    id: crypto.randomUUID(),
+    type,
+    x,
+    y,
+    config: structuredClone(config)
+  };
+}
+
+function createNewBot() {
+  currentGame = $("editor-game").value || "chess";
+  $("bot-name").value = "My Bot";
+  graph = {
+    nodes: [
+      makeNode("event", 100, 100),
+      makeNode("inputs", 390, 100),
+      makeNode("outputs", 850, 100)
+    ],
+    connections: []
+  };
+  graph.connections.push({
+    from: graph.nodes[0].id,
+    fromPort: "next",
+    to: graph.nodes[2].id,
+    toPort: "exec"
+  });
+  selectedNodeId = null;
+  pendingPort = null;
+  renderEditor();
+}
+
+function createNewBot() {
+  showPage("editor");
+  $("editor-game").value = currentGame;
+  $("bot-name").value = "My Bot";
+  graph = {
+    nodes: [
+      makeNode("event", 100, 100),
+      makeNode("inputs", 390, 100),
+      makeNode("outputs", 850, 100)
+    ],
+    connections: []
+  };
+  graph.connections.push({
+    from: graph.nodes[0].id, fromPort: "next",
+    to: graph.nodes[2].id, toPort: "exec"
+  });
+  selectedNodeId = null;
+  renderEditor();
+}
+
+function loadGraphFromBot(bot) {
+  currentGame = bot.game;
+  $("editor-game").value = bot.game;
+  $("bot-name").value = bot.name;
+  graph = structuredClone(bot.graph);
+  selectedNodeId = null;
+  pendingPort = null;
+  showPage("editor");
+  renderEditor();
+}
+
+function getNodePorts(node) {
+  const def = NODE_DEFS[node.type];
+  if (!def) return { inputs: [], outputs: [] };
+
+  if (node.type === "inputs") {
+    return {
+      inputs: [],
+      outputs: GAMES[currentGame].inputs
+    };
+  }
+
+  if (node.type === "outputs") {
+    return {
+      inputs: [["exec", "Execute", "exec"], ...GAMES[currentGame].outputs],
+      outputs: []
+    };
+  }
+
+  return {
+    inputs: def.inputs || [],
+    outputs: def.outputs || []
+  };
+}
+
+function renderEditor() {
+  currentGame = $("editor-game").value || currentGame;
+  $("workspace-game").textContent = GAMES[currentGame].name.toUpperCase();
+  renderNodeLibrary();
+  renderGraph();
+}
+
+function renderNodeLibrary() {
+  const root = $("node-library");
+  root.innerHTML = "";
+
+  const categories = [...new Set(Object.values(NODE_DEFS).map(n => n.category))];
+  categories.forEach(category => {
     const heading = document.createElement("div");
     heading.className = "node-category";
     heading.textContent = category;
     root.appendChild(heading);
 
-    entries.forEach(([key,def]) => {
+    Object.entries(NODE_DEFS).filter(([, def]) => def.category === category).forEach(([type, def]) => {
       const button = document.createElement("button");
       button.className = "library-node";
       button.textContent = "+ " + def.label;
-      button.onclick = () => addNode(key);
+      button.addEventListener("click", () => addGraphNode(type));
       root.appendChild(button);
     });
   });
-
-  const gameHeading = document.createElement("div");
-  gameHeading.className = "node-category";
-  gameHeading.textContent = "GAME BLOCKS";
-  root.appendChild(gameHeading);
-
-  ["gameInputs","gameOutputs"].forEach(type => {
-    const button = document.createElement("button");
-    button.className = "library-node";
-    button.textContent = "+ " + NODE_TYPES[type].label;
-    button.onclick = () => addNode(type);
-    root.appendChild(button);
-  });
 }
 
-function addNode(type) {
-  if (!NODE_TYPES[type]) return;
-
-  if (type === "gameInputs" && nodes.some(n => n.type === type)) {
-    selectNode(nodes.find(n => n.type === type).id);
-    return;
-  }
-
-  if (type === "gameOutputs" && nodes.some(n => n.type === type)) {
-    selectNode(nodes.find(n => n.type === type).id);
-    return;
-  }
-
-  const node = {
-    id:uid(),
-    type,
-    x:45 + Math.random() * 100,
-    y:45 + Math.random() * 100,
-    config:{
-      value:type === "number" ? 0 : "",
-      operation:">",
-      logic:"AND",
-      name:"myVariable",
-      boolean:false
-    }
-  };
-
-  nodes.push(node);
-  selectedNode = node.id;
-  renderNodes();
+function addGraphNode(type) {
+  const count = graph.nodes.length;
+  const node = makeNode(type, 260 + (count % 4) * 225, 100 + Math.floor(count / 4) * 190);
+  graph.nodes.push(node);
+  selectedNodeId = node.id;
+  renderGraph();
 }
 
-/* ============================================================
-   CONNECTIONS
-   ============================================================ */
-
-function handlePortClick(nodeId, portId) {
-  const port = getPort(nodeId, portId);
-  if (!port) return;
-
-  if (!pendingPort) {
-    if (port.direction !== "out") {
-      updateConnectionHint("Commence par une prise de sortie.");
-      return;
-    }
-
-    pendingPort = {nodeId,portId};
-    renderNodes();
-    updateConnectionHint("Maintenant, clique sur une prise d'entrée compatible.");
-    return;
-  }
-
-  const source = getPort(pendingPort.nodeId,pendingPort.portId);
-
-  if (port.direction !== "in") {
-    pendingPort = null;
-    renderNodes();
-    updateConnectionHint("La deuxième prise doit être une entrée.");
-    return;
-  }
-
-  if (pendingPort.nodeId === nodeId) {
-    pendingPort = null;
-    renderNodes();
-    updateConnectionHint("Impossible de relier un bloc à lui-même.");
-    return;
-  }
-
-  if (!source || !compatibleTypes(source.type,port.type)) {
-    pendingPort = null;
-    renderNodes();
-    updateConnectionHint("Types incompatibles.");
-    return;
-  }
-
-  // Une entrée ne reçoit qu'une connexion.
-  connections = connections.filter(c =>
-    !(c.to.node === nodeId && c.to.port === portId)
-  );
-
-  connections.push({
-    id:uid(),
-    from:{node:pendingPort.nodeId,port:pendingPort.portId},
-    to:{node:nodeId,port:portId}
-  });
-
-  pendingPort = null;
-  renderNodes();
-  updateConnectionHint("Connexion créée !");
+function portElement(nodeId, portId, direction, type) {
+  const button = document.createElement("button");
+  button.className = `port ${type} ${direction}`;
+  button.title = `${direction === "output" ? "Output" : "Input"}: ${portId} (${type})`;
+  button.dataset.node = nodeId;
+  button.dataset.port = portId;
+  button.dataset.direction = direction;
+  button.dataset.type = type;
+  button.addEventListener("click", handlePortClick);
+  return button;
 }
 
-function removeConnection(id) {
-  connections = connections.filter(c => c.id !== id);
-  renderConnections();
-}
-
-function updateConnectionHint(message) {
-  const hint = $("connection-hint");
-  if (!hint) return;
-
-  hint.textContent = message || (
-    pendingPort
-      ? "Choisis une prise d'entrée compatible"
-      : "Clique sur une sortie puis une entrée"
-  );
-}
-
-function getConnectionForInput(nodeId, portId) {
-  return connections.find(c =>
-    c.to.node === nodeId && c.to.port === portId
-  );
-}
-
-function getConnectionsFrom(nodeId, portId) {
-  return connections.filter(c =>
-    c.from.node === nodeId && c.from.port === portId
-  );
-}
-
-function portElement(nodeId, portId) {
-  return document.querySelector(
-    `.node-port[data-node="${nodeId}"][data-port="${portId}"]`
-  );
-}
-
-function renderConnections() {
-  const svg = $("connections");
-  const canvas = $("node-canvas");
-  if (!svg || !canvas) return;
-
-  const width = Math.max(canvas.scrollWidth,canvas.clientWidth);
-  const height = Math.max(canvas.scrollHeight,canvas.clientHeight);
-
-  svg.setAttribute("width",width);
-  svg.setAttribute("height",height);
-  svg.setAttribute("viewBox",`0 0 ${width} ${height}`);
-  svg.innerHTML = "";
-
-  connections.forEach(connection => {
-    const from = portElement(connection.from.node,connection.from.port);
-    const to = portElement(connection.to.node,connection.to.port);
-    if (!from || !to) return;
-
-    const a = from.getBoundingClientRect();
-    const b = to.getBoundingClientRect();
-    const c = canvas.getBoundingClientRect();
-
-    const x1 = a.left + a.width/2 - c.left + canvas.scrollLeft;
-    const y1 = a.top + a.height/2 - c.top + canvas.scrollTop;
-    const x2 = b.left + b.width/2 - c.left + canvas.scrollLeft;
-    const y2 = b.top + b.height/2 - c.top + canvas.scrollTop;
-
-    const curve = Math.max(45,Math.abs(x2-x1)*.5);
-
-    const path = document.createElementNS("http://www.w3.org/2000/svg","path");
-    path.setAttribute("d",`M ${x1} ${y1} C ${x1+curve} ${y1}, ${x2-curve} ${y2}, ${x2} ${y2}`);
-    path.setAttribute("class",getPort(connection.from.node,connection.from.port)?.type === "exec" ? "wire exec" : "wire data");
-    path.dataset.id = connection.id;
-
-    path.addEventListener("click",() => removeConnection(connection.id));
-    svg.appendChild(path);
-  });
-}
-
-/* ============================================================
-   NODE RENDERING
-   ============================================================ */
-
-function createPort(node,port) {
+function addPortRow(container, node, port, direction) {
+  const [id, label, type] = port;
   const row = document.createElement("div");
-  row.className = "node-port-row " + port.direction;
+  row.className = "node-port-row";
 
-  const socket = document.createElement("button");
-  socket.className = "node-port";
-  socket.dataset.node = node.id;
-  socket.dataset.port = port.id;
-  socket.dataset.type = port.type;
-  socket.title = `${port.label} (${port.type})`;
+  const text = document.createElement("span");
+  text.className = "port-label";
+  text.textContent = label;
 
-  const linked = port.direction === "in"
-    ? !!getConnectionForInput(node.id,port.id)
-    : getConnectionsFrom(node.id,port.id).length > 0;
+  const socket = portElement(node.id, id, direction, type);
 
-  if (linked) socket.classList.add("connected");
-
-  if (
-    pendingPort &&
-    pendingPort.nodeId === node.id &&
-    pendingPort.portId === port.id
-  ) {
-    socket.classList.add("pending");
-  }
-
-  socket.addEventListener("click",e => {
-    e.stopPropagation();
-    handlePortClick(node.id,port.id);
-  });
-
-  const label = document.createElement("span");
-  label.textContent = port.label;
-
-  if (port.direction === "in") {
-    row.append(socket,label);
+  if (direction === "input") {
+    row.append(socket, text);
   } else {
-    row.append(label,socket);
+    row.append(text, socket);
   }
-
-  return row;
+  container.appendChild(row);
 }
 
-function makeNodeSetting(node) {
-  const wrap = document.createElement("div");
-
-  if (node.type === "number") {
-    const input = document.createElement("input");
-    input.className = "node-setting";
-    input.type = "number";
-    input.value = node.config.value ?? 0;
-    input.addEventListener("input",() => {
-      node.config.value = Number(input.value);
-    });
-    wrap.append(input);
-  }
-
-  if (node.type === "boolean") {
-    const select = document.createElement("select");
-    select.className = "node-setting";
-
-    [["true","TRUE"],["false","FALSE"]].forEach(([value,label]) => {
-      const option = document.createElement("option");
-      option.value = value;
-      option.textContent = label;
-      select.append(option);
-    });
-
-    select.value = String(!!node.config.boolean);
-    select.onchange = () => node.config.boolean = select.value === "true";
-    wrap.append(select);
-  }
-
-  if (node.type === "text") {
-    const input = document.createElement("input");
-    input.className = "node-setting";
-    input.value = node.config.value || "";
-    input.placeholder = "Enter text";
-    input.oninput = () => node.config.value = input.value;
-    wrap.append(input);
-  }
-
-  if (node.type === "math") {
-    const select = document.createElement("select");
-    select.className = "node-setting";
-
-    ["+","-","×","÷","%","MIN","MAX","POWER"].forEach(op => {
-      const option = document.createElement("option");
-      option.value = op;
-      option.textContent = op;
-      select.append(option);
-    });
-
-    select.value = node.config.operation || "+";
-    select.onchange = () => node.config.operation = select.value;
-    wrap.append(select);
-  }
-
-  if (node.type === "compare") {
-    const select = document.createElement("select");
-    select.className = "node-setting";
-
-    [">","<",">=","<=","==","!="].forEach(op => {
-      const option = document.createElement("option");
-      option.value = op;
-      option.textContent = op;
-      select.append(option);
-    });
-
-    select.value = node.config.operation || ">";
-    select.onchange = () => node.config.operation = select.value;
-    wrap.append(select);
-  }
-
-  if (node.type === "logic") {
-    const select = document.createElement("select");
-    select.className = "node-setting";
-
-    ["AND","OR","XOR"].forEach(op => {
-      const option = document.createElement("option");
-      option.value = op;
-      option.textContent = op;
-      select.append(option);
-    });
-
-    select.value = node.config.logic || "AND";
-    select.onchange = () => node.config.logic = select.value;
-    wrap.append(select);
-  }
-
-  if (node.type === "setVariable" || node.type === "getVariable") {
-    const input = document.createElement("input");
-    input.className = "node-setting";
-    input.value = node.config.name || "myVariable";
-    input.placeholder = "Variable name";
-    input.oninput = () => {
-      node.config.name = input.value;
-      renderProperties();
-    };
-    wrap.append(input);
-  }
-
-  if (node.type === "repeat") {
-    const input = document.createElement("input");
-    input.className = "node-setting";
-    input.type = "number";
-    input.min = 0;
-    input.max = 100;
-    input.value = node.config.count ?? 3;
-    input.oninput = () => node.config.count = Math.max(0,Math.min(100,Number(input.value)));
-    wrap.append(input);
-  }
-
-  return wrap;
-}
-
-function renderNodes() {
+function renderGraph() {
   const canvas = $("node-canvas");
-  if (!canvas) return;
-
   canvas.querySelectorAll(".visual-node").forEach(el => el.remove());
 
-  const empty = $("empty-message");
-  if (empty) empty.style.display = nodes.length ? "none" : "grid";
+  $("empty-workspace").style.display = graph.nodes.length ? "none" : "block";
+  $("node-count").textContent = `${graph.nodes.length} BLOCKS`;
 
-  nodes.forEach(node => {
-    const definition = NODE_TYPES[node.type];
-    if (!definition) return;
+  graph.nodes.forEach(node => {
+    const def = NODE_DEFS[node.type];
+    if (!def) return;
 
-    const element = document.createElement("div");
-    element.className = "visual-node" + (selectedNode === node.id ? " selected" : "");
-    element.dataset.id = node.id;
-    element.style.left = node.x + "px";
-    element.style.top = node.y + "px";
+    const ports = getNodePorts(node);
+    const el = document.createElement("div");
+    el.className = "visual-node" + (node.id === selectedNodeId ? " selected" : "");
+    el.style.left = node.x + "px";
+    el.style.top = node.y + "px";
+    el.dataset.id = node.id;
 
-    const header = document.createElement("div");
-    header.className = "node-header";
-    header.style.background = definition.color;
-    header.style.color = "#071018";
-    header.textContent = definition.label;
+    const head = document.createElement("div");
+    head.className = "node-head";
+    head.style.background = def.color;
+
+    const title = document.createElement("span");
+    title.textContent = def.label;
+
+    const remove = document.createElement("button");
+    remove.className = "node-remove";
+    remove.textContent = "×";
+    remove.title = "Delete block";
+    remove.addEventListener("click", e => {
+      e.stopPropagation();
+      deleteNode(node.id);
+    });
+
+    head.append(title, remove);
+    head.addEventListener("mousedown", e => startNodeDrag(e, node.id));
 
     const body = document.createElement("div");
     body.className = "node-body";
 
-    const description = document.createElement("div");
-    description.style.fontSize = "9px";
-    description.style.color = "#94a1b8";
-    description.textContent = definition.description;
-    body.append(description);
+    const description = document.createElement("p");
+    description.className = "node-description";
+    description.textContent = def.description;
+    body.appendChild(description);
 
-    const ports = getPorts(node);
-    const inputs = ports.filter(p => p.direction === "in");
-    const outputs = ports.filter(p => p.direction === "out");
-
-    const maxRows = Math.max(inputs.length,outputs.length);
-
-    for (let i=0;i<maxRows;i++) {
-      const row = document.createElement("div");
-      row.style.display = "grid";
-      row.style.gridTemplateColumns = "1fr 1fr";
-      row.style.gap = "8px";
-
-      const left = document.createElement("div");
-      const right = document.createElement("div");
-
-      if (inputs[i]) left.append(createPort(node,inputs[i]));
-      if (outputs[i]) right.append(createPort(node,outputs[i]));
-
-      row.append(left,right);
-      body.append(row);
+    if (node.type === "number" || node.type === "text" || node.type === "boolean") {
+      const input = document.createElement("input");
+      input.className = "node-config";
+      input.value = node.config.value ?? (node.type === "number" ? "0" : node.type === "boolean" ? "true" : "");
+      input.type = "text";
+      input.addEventListener("input", () => {
+        node.config.value = node.type === "number" ? Number(input.value) : input.value;
+      });
+      body.appendChild(input);
     }
 
-    body.append(makeNodeSetting(node));
+    if (node.type === "math") {
+      const select = document.createElement("select");
+      select.className = "node-config";
+      [["add", "+"], ["sub", "−"], ["mul", "×"], ["div", "÷"], ["mod", "%"], ["min", "MIN"], ["max", "MAX"], ["pow", "POWER"]].forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+      select.value = node.config.operation || "add";
+      select.onchange = () => node.config.operation = select.value;
+      body.appendChild(select);
+    }
 
-    element.append(header,body);
+    if (node.type === "compare") {
+      const select = document.createElement("select");
+      select.className = "node-config";
+      [">", "<", "==", "!=", ">=", "<="].forEach(op => {
+        const opt = document.createElement("option");
+        opt.value = op;
+        opt.textContent = op;
+        select.appendChild(opt);
+      });
+      select.value = node.config.operation || ">";
+      select.onchange = () => node.config.operation = select.value;
+      body.appendChild(select);
+    }
 
-    header.addEventListener("pointerdown",e => {
-      if (e.button !== 0) return;
-      if (e.target.closest("button")) return;
+    if (node.type === "logic") {
+      const select = document.createElement("select");
+      select.className = "node-config";
+      [["and", "AND"], ["or", "OR"], ["not", "NOT"], ["xor", "XOR"]].forEach(([value, label]) => {
+        const opt = document.createElement("option");
+        opt.value = value;
+        opt.textContent = label;
+        select.appendChild(opt);
+      });
+      select.value = node.config.operation || "and";
+      select.onchange = () => node.config.operation = select.value;
+      body.appendChild(select);
+    }
 
-      selectedNode = node.id;
+    if (node.type === "variable") {
+      const input = document.createElement("input");
+      input.className = "node-config";
+      input.placeholder = "Variable name";
+      input.value = node.config.name || "myVariable";
+      input.oninput = () => node.config.name = input.value;
+      body.appendChild(input);
+    }
 
-      dragging = {
-        id:node.id,
-        startX:e.clientX,
-        startY:e.clientY,
-        originalX:node.x,
-        originalY:node.y
-      };
+    if (node.type === "inputs") {
+      GAMES[currentGame].inputs.forEach(port => addPortRow(body, node, port, "output"));
+    } else {
+      ports.inputs.forEach(port => addPortRow(body, node, port, "input"));
+      ports.outputs.forEach(port => addPortRow(body, node, port, "output"));
+    }
 
-      header.setPointerCapture(e.pointerId);
-      renderProperties();
+    el.append(head, body);
+    el.addEventListener("click", () => {
+      selectedNodeId = node.id;
+      renderGraph();
     });
-
-    header.addEventListener("pointermove",e => {
-      if (!dragging || dragging.id !== node.id) return;
-
-      node.x = Math.max(0,dragging.originalX + e.clientX - dragging.startX);
-      node.y = Math.max(0,dragging.originalY + e.clientY - dragging.startY);
-
-      element.style.left = node.x + "px";
-      element.style.top = node.y + "px";
-      renderConnections();
-    });
-
-    header.addEventListener("pointerup",() => dragging = null);
-    header.addEventListener("pointercancel",() => dragging = null);
-
-    element.addEventListener("click",e => {
-      if (e.target.closest(".node-port") || e.target.matches("input,select")) return;
-      selectNode(node.id);
-    });
-
-    element.addEventListener("contextmenu",e => {
-      e.preventDefault();
-      deleteNode(node.id);
-    });
-
-    canvas.appendChild(element);
+    canvas.appendChild(el);
   });
 
+  renderWires();
   renderProperties();
-  requestAnimationFrame(renderConnections);
 }
 
-function selectNode(id) {
-  selectedNode = id;
-  renderNodes();
+function compatibleTypes(a, b) {
+  return a === b || a === "any" || b === "any";
 }
 
-function deleteNode(id) {
-  nodes = nodes.filter(n => n.id !== id);
-  connections = connections.filter(c =>
-    c.from.node !== id && c.to.node !== id
+function handlePortClick(event) {
+  event.stopPropagation();
+  const port = event.currentTarget;
+  const info = {
+    node: port.dataset.node,
+    port: port.dataset.port,
+    direction: port.dataset.direction,
+    type: port.dataset.type
+  };
+
+  if (!pendingPort) {
+    if (info.direction !== "output") {
+      $("connection-status").textContent = "Commence par cliquer sur un port de sortie.";
+      return;
+    }
+    pendingPort = info;
+    port.classList.add("pending");
+    $("connection-status").textContent = "Choisis maintenant un port d'entrée.";
+    return;
+  }
+
+  if (info.direction !== "input") {
+    pendingPort = null;
+    renderGraph();
+    $("connection-status").textContent = "Connexion annulée.";
+    return;
+  }
+
+  if (pendingPort.node === info.node) {
+    pendingPort = null;
+    renderGraph();
+    return;
+  }
+
+  if (!compatibleTypes(pendingPort.type, info.type)) {
+    $("connection-status").textContent = "Types incompatibles : " + pendingPort.type + " → " + info.type;
+    return;
+  }
+
+  graph.connections = graph.connections.filter(c =>
+    !(c.to === info.node && c.toPort === info.port)
   );
 
-  if (selectedNode === id) selectedNode = null;
-  if (pendingPort?.nodeId === id) pendingPort = null;
+  graph.connections.push({
+    from: pendingPort.node,
+    fromPort: pendingPort.port,
+    to: info.node,
+    toPort: info.port
+  });
 
-  renderNodes();
+  pendingPort = null;
+  $("connection-status").textContent = "Connexion créée.";
+  renderGraph();
+}
+
+function renderWires() {
+  const svg = $("wires");
+  svg.innerHTML = "";
+
+  graph.connections.forEach((connection, index) => {
+    const from = document.querySelector(
+      `.port[data-node="${connection.from}"][data-port="${connection.fromPort}"][data-direction="output"]`
+    );
+    const to = document.querySelector(
+      `.port[data-node="${connection.to}"][data-port="${connection.toPort}"][data-direction="input"]`
+    );
+
+    if (!from || !to) return;
+
+    const a = from.getBoundingClientRect();
+    const b = to.getBoundingClientRect();
+    const canvasRect = $("node-canvas").getBoundingClientRect();
+
+    const x1 = a.left + a.width / 2 - canvasRect.left + $("canvas-wrap").scrollLeft;
+    const y1 = a.top + a.height / 2 - canvasRect.top + $("canvas-wrap").scrollTop;
+    const x2 = b.left + b.width / 2 - canvasRect.left + $("canvas-wrap").scrollLeft;
+    const y2 = b.top + b.height / 2 - canvasRect.top + $("canvas-wrap").scrollTop;
+    const curve = Math.max(45, Math.abs(x2 - x1) * .5);
+    const d = `M ${x1} ${y1} C ${x1 + curve} ${y1}, ${x2 - curve} ${y2}, ${x2} ${y2}`;
+
+    const sourcePort = from.dataset.type;
+    const path = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    path.setAttribute("d", d);
+    path.setAttribute("class", `wire ${sourcePort}`);
+    svg.appendChild(path);
+
+    const hit = document.createElementNS("http://www.w3.org/2000/svg", "path");
+    hit.setAttribute("d", d);
+    hit.setAttribute("class", "wire-hit");
+    hit.addEventListener("click", () => {
+      graph.connections.splice(index, 1);
+      renderGraph();
+      $("connection-status").textContent = "Connexion supprimée.";
+    });
+    svg.appendChild(hit);
+  });
+}
+
+function startNodeDrag(event, id) {
+  if (event.target.closest("button")) return;
+  const node = graph.nodes.find(n => n.id === id);
+  if (!node) return;
+
+  selectedNodeId = id;
+  dragState = {
+    id,
+    x: event.clientX,
+    y: event.clientY,
+    originalX: node.x,
+    originalY: node.y
+  };
+
+  event.preventDefault();
+  renderProperties();
+}
+
+window.addEventListener("mousemove", event => {
+  if (!dragState) return;
+  const node = graph.nodes.find(n => n.id === dragState.id);
+  if (!node) return;
+
+  node.x = Math.max(0, dragState.originalX + event.clientX - dragState.x);
+  node.y = Math.max(0, dragState.originalY + event.clientY - dragState.y);
+
+  const element = document.querySelector(`.visual-node[data-id="${node.id}"]`);
+  if (element) {
+    element.style.left = node.x + "px";
+    element.style.top = node.y + "px";
+  }
+  renderWires();
+});
+
+window.addEventListener("mouseup", () => dragState = null);
+
+function deleteNode(id) {
+  graph.nodes = graph.nodes.filter(n => n.id !== id);
+  graph.connections = graph.connections.filter(c => c.from !== id && c.to !== id);
+  if (selectedNodeId === id) selectedNodeId = null;
+  renderGraph();
 }
 
 function renderProperties() {
-  const root = $("properties-content");
-  if (!root) return;
-
+  const root = $("properties");
   root.innerHTML = "";
-
-  const node = nodes.find(n => n.id === selectedNode);
+  const node = graph.nodes.find(n => n.id === selectedNodeId);
 
   if (!node) {
-    root.textContent = "Sélectionne un bloc pour voir ses propriétés.";
+    root.innerHTML = '<p class="muted">Sélectionne un bloc pour voir ses propriétés.</p>';
     return;
   }
 
-  const title = document.createElement("b");
-  title.textContent = NODE_TYPES[node.type].label;
+  const def = NODE_DEFS[node.type];
+  const title = document.createElement("strong");
+  title.textContent = def.label;
+  root.appendChild(title);
 
   const description = document.createElement("p");
-  description.textContent = NODE_TYPES[node.type].description;
+  description.textContent = def.description;
+  root.appendChild(description);
 
-  const details = document.createElement("p");
-  details.textContent = `ID : ${node.id}`;
+  const label = document.createElement("label");
+  label.className = "property-label";
+  label.textContent = "BLOCK ID";
+  const id = document.createElement("input");
+  id.className = "property-input";
+  id.disabled = true;
+  id.value = node.id.slice(0, 8);
+  root.append(label, id);
 
-  const deleteButton = document.createElement("button");
-  deleteButton.className = "secondary-button";
-  deleteButton.textContent = "DELETE NODE";
-  deleteButton.onclick = () => deleteNode(node.id);
+  if (node.type === "number" || node.type === "text" || node.type === "boolean") {
+    const valueLabel = document.createElement("label");
+    valueLabel.className = "property-label";
+    valueLabel.textContent = "VALUE";
+    const value = document.createElement("input");
+    value.className = "property-input";
+    value.value = node.config.value ?? "";
+    value.onchange = () => {
+      node.config.value = node.type === "number" ? Number(value.value) : value.value;
+      renderGraph();
+    };
+    root.append(valueLabel, value);
+  }
 
-  root.append(title,description,details,deleteButton);
+  const remove = document.createElement("button");
+  remove.className = "secondary";
+  remove.style.marginTop = "15px";
+  remove.textContent = "DELETE BLOCK";
+  remove.onclick = () => deleteNode(node.id);
+  root.appendChild(remove);
 }
 
-/* ============================================================
+/* =========================================================
    GRAPH INTERPRETER
-   ============================================================ */
+   ========================================================= */
 
-function getGameOutputDefaults(game) {
+function executeGraph(sourceGraph, context, game) {
+  const nodes = sourceGraph.nodes || [];
+  const links = sourceGraph.connections || [];
+  const cache = new Map();
+  const variables = {};
+
+  function findNode(id) {
+    return nodes.find(n => n.id === id);
+  }
+
+  function inputValue(node, port, fallback = 0) {
+    const link = links.find(c => c.to === node.id && c.toPort === port);
+    if (!link) return fallback;
+    return evaluate(link.from, link.fromPort);
+  }
+
+  function evaluate(id, port = "value", depth = 0) {
+    if (depth > 60) return 0;
+    const key = id + ":" + port;
+    if (cache.has(key)) return cache.get(key);
+
+    const node = findNode(id);
+    if (!node) return 0;
+
+    const val = (p, fallback = 0) => {
+      const link = links.find(c => c.to === node.id && c.toPort === p);
+      return link ? evaluate(link.from, link.fromPort, depth + 1) : fallback;
+    };
+
+    let result = 0;
+
+    switch (node.type) {
+      case "number":
+        result = Number(node.config.value ?? 0);
+        break;
+      case "boolean":
+        result = String(node.config.value ?? "true") === "true";
+        break;
+      case "text":
+        result = String(node.config.value ?? "");
+        break;
+      case "inputs":
+        result = context[port] ?? 0;
+        break;
+      case "math": {
+        const a = Number(val("a", 0));
+        const b = Number(val("b", 0));
+        const op = node.config.operation || "add";
+        const operations = {
+          add: () => a + b,
+          sub: () => a - b,
+          mul: () => a * b,
+          div: () => b === 0 ? 0 : a / b,
+          mod: () => b === 0 ? 0 : a % b,
+          min: () => Math.min(a, b),
+          max: () => Math.max(a, b),
+          pow: () => Math.pow(a, b)
+        };
+        result = operations[op]?.() ?? 0;
+        break;
+      }
+      case "compare": {
+        const a = Number(val("a", 0));
+        const b = Number(val("b", 0));
+        const op = node.config.operation || ">";
+        result = ({
+          ">": a > b, "<": a < b, "==": a === b,
+          "!=": a !== b, ">=": a >= b, "<=": a <= b
+        })[op] ?? false;
+        break;
+      }
+      case "logic": {
+        const a = Boolean(val("a", false));
+        const b = Boolean(val("b", false));
+        const op = node.config.operation || "and";
+        result = op === "and" ? a && b :
+          op === "or" ? a || b :
+          op === "not" ? !a :
+          op === "xor" ? a !== b : false;
+        break;
+      }
+      case "if":
+        result = val("condition", false) ? val("yes", 0) : val("no", 0);
+        break;
+      case "random": {
+        const min = Number(val("min", 0));
+        const max = Number(val("max", 1));
+        result = min + Math.random() * (max - min);
+        break;
+      }
+      case "clamp":
+        result = Math.max(Number(val("min", 0)),
+          Math.min(Number(val("max", 1)), Number(val("value", 0))));
+        break;
+      case "variable": {
+        const name = node.config.name || "myVariable";
+        const link = links.find(c => c.to === node.id && c.toPort === "value");
+        if (link) variables[name] = evaluate(link.from, link.fromPort, depth + 1);
+        result = variables[name] ?? 0;
+        break;
+      }
+      case "listLength": {
+        const list = val("list", []);
+        result = Array.isArray(list) ? list.length : 0;
+        break;
+      }
+      case "listGet": {
+        const list = val("list", []);
+        const index = Math.floor(Number(val("index", 0)));
+        result = Array.isArray(list) ? (list[index] ?? 0) : 0;
+        break;
+      }
+      default:
+        result = 0;
+    }
+
+    cache.set(key, result);
+    return result;
+  }
+
   const result = {};
-  GAME_INFO[game].outputs.forEach(([id,,type]) => {
-    if (type === "boolean") result[id] = false;
-    else if (type === "number") result[id] = 0;
-    else result[id] = "";
+  const outputNode = nodes.find(n => n.type === "outputs");
+  if (!outputNode) return result;
+
+  GAMES[game].outputs.forEach(([key]) => {
+    result[key] = inputValue(outputNode, key, defaultOutput(game, key, context));
   });
+
   return result;
 }
 
-function executeBot(gameState, botData = null) {
-  const graph = botData || {
-    game:currentGame,
-    nodes,
-    connections
-  };
-
-  const localNodes = graph.nodes || [];
-  const localConnections = graph.connections || [];
-
-  const variables = {};
-  const outputs = getGameOutputDefaults(graph.game || currentGame);
-  const visited = new Set();
-  let operations = 0;
-
-  function findNode(id) {
-    return localNodes.find(n => n.id === id);
+function defaultOutput(game, key, context) {
+  if (game === "chess" && key === "moveIndex") return Math.floor(Math.random() * Math.max(1, context.legalMoveCount || 1));
+  if (game === "connect4" && key === "column") {
+    const available = context.availableColumns || [0,1,2,3,4,5,6];
+    return available[Math.floor(Math.random() * available.length)] ?? 3;
   }
-
-  function inputConnection(nodeId,portId) {
-    return localConnections.find(c =>
-      c.to.node === nodeId && c.to.port === portId
-    );
-  }
-
-  function outgoing(nodeId,portId) {
-    return localConnections.filter(c =>
-      c.from.node === nodeId && c.from.port === portId
-    );
-  }
-
-  function evaluate(nodeId,portId,depth=0) {
-    if (depth > 80) return 0;
-
-    const node = findNode(nodeId);
-    if (!node) return 0;
-
-    const key = `${nodeId}:${portId}`;
-    if (visited.has(key)) return 0;
-
-    visited.add(key);
-
-    const get = input => {
-      const link = inputConnection(node.id,input);
-      if (!link) return 0;
-      return evaluate(link.from.node,link.from.port,depth+1);
-    };
-
-    let value = 0;
-
-    switch(node.type) {
-      case "gameInputs":
-        value = gameState?.[portId] ?? 0;
-        break;
-
-      case "number":
-        value = Number(node.config.value) || 0;
-        break;
-
-      case "boolean":
-        value = !!node.config.boolean;
-        break;
-
-      case "text":
-        value = String(node.config.value || "");
-        break;
-
-      case "math": {
-        const a = Number(get("a")) || 0;
-        const b = Number(get("b")) || 0;
-        switch(node.config.operation) {
-          case "-": value = a-b; break;
-          case "×": value = a*b; break;
-          case "÷": value = b === 0 ? 0 : a/b; break;
-          case "%": value = b === 0 ? 0 : a%b; break;
-          case "MIN": value = Math.min(a,b); break;
-          case "MAX": value = Math.max(a,b); break;
-          case "POWER": value = Math.pow(a,b); break;
-          default: value = a+b;
-        }
-        break;
-      }
-
-      case "compare": {
-        const a = get("a");
-        const b = get("b");
-        switch(node.config.operation) {
-          case "<": value = a < b; break;
-          case ">=": value = a >= b; break;
-          case "<=": value = a <= b; break;
-          case "==": value = a == b; break;
-          case "!=": value = a != b; break;
-          default: value = a > b;
-        }
-        break;
-      }
-
-      case "logic": {
-        const a = !!get("a");
-        const b = !!get("b");
-        switch(node.config.logic) {
-          case "OR": value = a || b; break;
-          case "XOR": value = a !== b; break;
-          default: value = a && b;
-        }
-        break;
-      }
-
-      case "not":
-        value = !get("a");
-        break;
-
-      case "random": {
-        const min = Number(get("min")) || 0;
-        const max = Number(get("max")) || 1;
-        value = min + Math.random()*(max-min);
-        break;
-      }
-
-      case "getVariable":
-        value = variables[node.config.name] ?? 0;
-        break;
-
-      case "listLength": {
-        const list = get("list");
-        value = Array.isArray(list) ? list.length : 0;
-        break;
-      }
-
-      case "listGet": {
-        const list = get("list");
-        const index = Math.floor(Number(get("index")) || 0);
-        value = Array.isArray(list) ? (list[index] ?? 0) : 0;
-        break;
-      }
-
-      default:
-        value = 0;
-    }
-
-    visited.delete(key);
-    return value;
-  }
-
-  function getInput(node,port) {
-    const link = inputConnection(node.id,port);
-    if (!link) return 0;
-    return evaluate(link.from.node,link.from.port);
-  }
-
-  function follow(nodeId,portId,depth=0) {
-    if (depth > 100 || operations++ > 500) return;
-
-    const links = outgoing(nodeId,portId);
-
-    for (const link of links) {
-      const node = findNode(link.to.node);
-      if (!node) continue;
-
-      if (node.type === "condition") {
-        const condition = !!getInput(node,"condition");
-        follow(node.id,condition ? "true" : "false",depth+1);
-      }
-
-      else if (node.type === "setVariable") {
-        variables[node.config.name || "myVariable"] = getInput(node,"value");
-        follow(node.id,"next",depth+1);
-      }
-
-      else if (node.type === "repeat") {
-        const count = Math.max(0,Math.min(100,Math.floor(Number(getInput(node,"count")) || node.config.count || 0)));
-
-        for (let i=0;i<count;i++) {
-          follow(node.id,"body",depth+1);
-        }
-
-        follow(node.id,"next",depth+1);
-      }
-
-      else if (node.type === "gameOutputs") {
-        GAME_INFO[graph.game || currentGame].outputs.forEach(([id]) => {
-          outputs[id] = getInput(node,id);
-        });
-      }
-
-      else {
-        const nextPorts = getPorts(node).filter(p =>
-          p.direction === "out" && p.type === "exec"
-        );
-
-        nextPorts.forEach(p => follow(node.id,p.id,depth+1));
-      }
-    }
-  }
-
-  const start = localNodes.find(n => n.type === "event");
-
-  if (start) follow(start.id,"next");
-
-  return {
-    outputs,
-    variables,
-    operations,
-    success:!!start
-  };
+  if (game === "pingpong") return key === "paddleTargetX" ? context.ballX || 0 : context.ballY || 0;
+  if (game === "racing") return key === "throttle" ? 0.6 : 0;
+  if (game === "snake") return context.direction ?? 1;
+  return 0;
 }
 
-/* ============================================================
-   TEST BOT
-   ============================================================ */
-
-function makeTestState(game) {
-  if (game === "racing") {
-    return {
-      speed:45,front:12,frontLeft:8,frontRight:5,
-      left:4,right:6,rear:10,opponentDistance:20,
-      heading:0,curve:0.5
-    };
-  }
-
-  if (game === "pingpong") {
-    return {
-      ballX:1,ballY:1,ballZ:0,
-      ballVelocityX:-0.5,ballVelocityY:0.1,ballVelocityZ:0,
-      paddleX:0,paddleY:0,ballApproaching:true
-    };
-  }
-
-  if (game === "snake") {
-    return {
-      headX:10,headY:10,foodX:15,foodY:10,
-      distanceFood:5,wallFront:8,wallLeft:10,wallRight:10,
-      body:[],availableDirections:["up","down","left","right"]
-    };
-  }
-
-  if (game === "connect4") {
-    return {
-      availableColumns:[0,1,2,3,4,5,6],
-      currentPlayer:1,
-      board:Array.from({length:6},()=>Array(7).fill(0)),
-      centerColumn:3,
-      winningMoves:[],
-      opponentThreats:[]
-    };
-  }
-
-  return {
-    legalMoves:["e2e4","d2d4","g1f3"],
-    currentTurn:1,
-    isCheck:false,
-    whitePieces:16,
-    blackPieces:16,
-    moveCount:0,
-    board:[]
-  };
-}
-
-function testBot() {
-  const result = executeBot(makeTestState(currentGame));
-
-  const root = $("test-result");
-  if (!root) return;
-
-  if (!result.success) {
-    root.textContent = "Ajoute un bloc START / EVENT pour exécuter ton bot.";
-    return;
-  }
-
-  root.innerHTML = "";
-
-  const title = document.createElement("b");
-  title.textContent = "BOT EXECUTION SUCCESS";
-
-  const pre = document.createElement("pre");
-  pre.style.whiteSpace = "pre-wrap";
-  pre.style.color = "#35e6db";
-  pre.textContent = JSON.stringify(result.outputs,null,2);
-
-  const info = document.createElement("p");
-  info.textContent = `${result.operations} opérations exécutées.`;
-
-  root.append(title,pre,info);
-}
-
-/* ============================================================
-   SAVE / EXPORT / IMPORT
-   ============================================================ */
-
-function currentBotData() {
-  return {
-    format:BOT_FORMAT,
-    version:BOT_VERSION,
-    name:$("bot-name").value.trim() || "Unnamed Bot",
-    game:currentGame,
-    nodes:deepClone(nodes),
-    connections:deepClone(connections),
-    updated:new Date().toISOString()
-  };
-}
+/* =========================================================
+   BOT SAVING / IMPORT / EXPORT
+   ========================================================= */
 
 function saveBot() {
-  const bot = currentBotData();
+  const name = $("bot-name").value.trim() || "Unnamed Bot";
+  const bot = {
+    id: crypto.randomUUID(),
+    format: "BOTS_ARENA_BOT",
+    version: 2,
+    name,
+    game: currentGame,
+    graph: structuredClone(graph),
+    updated: new Date().toISOString()
+  };
 
-  savedBots = savedBots.filter(b =>
-    !(b.name === bot.name && b.game === bot.game)
-  );
-
-  savedBots.push(bot);
-  persistBots();
-
-  if ($("test-result")) {
-    $("test-result").textContent = `Bot "${bot.name}" sauvegardé.`;
-  }
-}
-
-function downloadJSON(data,filename) {
-  const blob = new Blob(
-    [JSON.stringify(data,null,2)],
-    {type:"application/json"}
-  );
-
-  const url = URL.createObjectURL(blob);
-  const link = document.createElement("a");
-  link.href = url;
-  link.download = filename;
-  document.body.appendChild(link);
-  link.click();
-  link.remove();
-
-  setTimeout(() => URL.revokeObjectURL(url),1000);
+  userBots = userBots.filter(b => !(b.name === name && b.game === currentGame));
+  userBots.push(bot);
+  saveUserBotsStorage();
+  renderBotList();
+  alert("Bot sauvegardé !");
 }
 
 function exportBot() {
-  downloadJSON(currentBotData(),"neonlab-bot.json");
+  const data = {
+    format: "BOTS_ARENA_BOT",
+    version: 2,
+    name: $("bot-name").value.trim() || "My Bot",
+    game: currentGame,
+    graph
+  };
+  downloadJSON(data, "bots-arena-" + currentGame + ".json");
 }
 
-function validateBot(data) {
-  if (!data || data.format !== BOT_FORMAT) {
-    throw new Error("Ce fichier n'est pas un bot NeonLab.");
-  }
-
-  if (!GAME_INFO[data.game]) {
-    throw new Error("Jeu inconnu.");
-  }
-
-  if (!Array.isArray(data.nodes) || !Array.isArray(data.connections)) {
-    throw new Error("Structure du bot invalide.");
-  }
-
-  const validTypes = new Set(Object.keys(NODE_TYPES));
-
-  for (const node of data.nodes) {
-    if (!node.id || !validTypes.has(node.type)) {
-      throw new Error("Un bloc du fichier est invalide.");
-    }
-  }
-
-  const ids = new Set(data.nodes.map(n => n.id));
-
-  for (const connection of data.connections) {
-    if (!ids.has(connection.from?.node) || !ids.has(connection.to?.node)) {
-      throw new Error("Une connexion pointe vers un bloc inexistant.");
-    }
-  }
-
-  return true;
+function downloadJSON(data, filename) {
+  const blob = new Blob([JSON.stringify(data, null, 2)], {type: "application/json"});
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
 
-async function readBotFile(file) {
-  const data = JSON.parse(await file.text());
-  validateBot(data);
+$("save-bot").addEventListener("click", saveBot);
+$("export-bot").addEventListener("click", exportBot);
+$("new-bot").addEventListener("click", createNewBot);
+$("import-bot").addEventListener("click", () => $("import-file").click());
 
-  currentGame = data.game;
-  $("editor-game").value = data.game;
-  $("bot-name").value = data.name || "Imported Bot";
+$("import-file").addEventListener("change", async event => {
+  const file = event.target.files[0];
+  if (!file) return;
+  try {
+    const data = JSON.parse(await file.text());
+    if (data.format !== "BOTS_ARENA_BOT" || data.version !== 2) throw new Error("Format incompatible.");
+    if (!GAMES[data.game] || !Array.isArray(data.graph?.nodes) || !Array.isArray(data.graph?.connections)) {
+      throw new Error("Fichier de bot invalide.");
+    }
+    currentGame = data.game;
+    $("editor-game").value = currentGame;
+    $("bot-name").value = data.name || "Imported Bot";
+    graph = data.graph;
+    renderEditor();
+    alert("Bot importé !");
+  } catch (error) {
+    alert("Import impossible : " + error.message);
+  }
+  event.target.value = "";
+});
 
-  nodes = deepClone(data.nodes);
-  connections = deepClone(data.connections);
-  selectedNode = null;
+$("editor-game").addEventListener("change", () => {
+  currentGame = $("editor-game").value;
+  graph = {nodes: [], connections: []};
+  selectedNodeId = null;
   pendingPort = null;
+  renderEditor();
+});
 
-  refreshEditor();
-  showPage("editor");
-}
+$("clear-graph").addEventListener("click", () => {
+  if (!confirm("Supprimer tous les blocs ?")) return;
+  graph = {nodes: [], connections: []};
+  selectedNodeId = null;
+  renderEditor();
+});
 
-function importBot() {
-  const input = $("bot-file-input");
-  if (!input) return;
-  input.click();
-}
+$("zoom-reset").addEventListener("click", () => {
+  $("canvas-wrap").scrollTo({left: 0, top: 0, behavior: "smooth"});
+});
 
-if ($("import-button")) {
-  $("import-button").addEventListener("click",importBot);
-}
+document.addEventListener("keydown", event => {
+  if (event.key === "Escape" && pendingPort) {
+    pendingPort = null;
+    renderGraph();
+    $("connection-status").textContent = "Connexion annulée.";
+  }
+});
 
-if ($("export-button")) {
-  $("export-button").addEventListener("click",exportBot);
-}
-
-if ($("save-button")) {
-  $("save-button").addEventListener("click",saveBot);
-}
-
-if ($("test-button")) {
-  $("test-button").addEventListener("click",testBot);
-}
-
-if ($("bot-file-input")) {
-  $("bot-file-input").addEventListener("change",async e => {
-    const file = e.target.files?.[0];
-    if (!file) return;
-
-    try {
-      await readBotFile(file);
-    } catch(error) {
-      alert("Import impossible : " + error.message);
-    }
-
-    e.target.value = "";
-  });
-}
-
-/* ============================================================
+/* =========================================================
    BOT LIBRARY
-   ============================================================ */
+   ========================================================= */
 
-function renderBots() {
+function renderBotList() {
   const root = $("bot-list");
-  if (!root) return;
-
   root.innerHTML = "";
 
-  if (!savedBots.length) {
-    root.textContent = "Aucun bot sauvegardé.";
+  if (!userBots.length) {
+    root.innerHTML = '<p class="muted">Aucun bot sauvegardé. Crée ton premier bot dans l’éditeur.</p>';
     return;
   }
 
-  savedBots.forEach(bot => {
-    const card = document.createElement("div");
+  userBots.forEach(bot => {
+    const card = document.createElement("article");
     card.className = "bot-item";
 
-    const title = document.createElement("b");
+    const title = document.createElement("h3");
     title.textContent = bot.name;
-
-    const description = document.createElement("p");
-    description.textContent =
-      `${GAME_INFO[bot.game]?.name || bot.game} · ${bot.nodes?.length || 0} blocs`;
+    const info = document.createElement("p");
+    info.textContent = `${GAMES[bot.game]?.name || bot.game} · ${bot.graph.nodes.length} blocks`;
 
     const edit = document.createElement("button");
-    edit.className = "secondary-button";
+    edit.className = "secondary";
     edit.textContent = "EDIT";
-    edit.onclick = () => {
-      currentGame = bot.game;
-      $("editor-game").value = bot.game;
-      $("bot-name").value = bot.name;
-      nodes = deepClone(bot.nodes || []);
-      connections = deepClone(bot.connections || []);
-      showPage("editor");
-    };
+    edit.onclick = () => loadGraphFromBot(bot);
 
     const exportButton = document.createElement("button");
-    exportButton.className = "secondary-button";
+    exportButton.className = "secondary";
     exportButton.textContent = "EXPORT";
-    exportButton.onclick = () => downloadJSON(bot,"neonlab-bot.json");
+    exportButton.onclick = () => downloadJSON(bot, bot.name.replace(/[^a-z0-9]/gi, "_") + ".json");
 
     const remove = document.createElement("button");
-    remove.className = "secondary-button";
+    remove.className = "secondary";
     remove.textContent = "DELETE";
     remove.onclick = () => {
-      savedBots = savedBots.filter(b => b.id !== bot.id);
-      persistBots();
-      renderBots();
+      if (!confirm("Supprimer ce bot ?")) return;
+      userBots = userBots.filter(b => b.id !== bot.id);
+      saveUserBotsStorage();
+      renderBotList();
     };
 
-    card.append(title,description,edit,exportButton,remove);
+    card.append(title, info, edit, exportButton, remove);
     root.appendChild(card);
   });
 }
 
-/* ============================================================
-   DEFAULT BOTS
-   ============================================================ */
+/* =========================================================
+   CHESS
+   ========================================================= */
 
-function makeDefaultBot(game,name,strategy) {
-  const event = {
-    id:uid(),type:"event",x:40,y:100,
-    config:{}
-  };
-
-  const inputs = {
-    id:uid(),type:"gameInputs",x:300,y:50,
-    config:{}
-  };
-
-  const outputs = {
-    id:uid(),type:"gameOutputs",x:650,y:100,
-    config:{}
-  };
-
-  const extra = [];
-  const wires = [];
-
-  if (game === "connect4") {
-    const random = {
-      id:uid(),type:"random",x:480,y:320,
-      config:{}
-    };
-
-    const min = {
-      id:uid(),type:"number",x:270,y:320,
-      config:{value:0}
-    };
-
-    const max = {
-      id:uid(),type:"number",x:270,y:410,
-      config:{value:6}
-    };
-
-    extra.push(random,min,max);
-
-    wires.push(
-      {id:uid(),from:{node:event.id,port:"next"},to:{node:outputs.id,port:"execIn"}},
-      {id:uid(),from:{node:min.id,port:"value"},to:{node:random.id,port:"min"}},
-      {id:uid(),from:{node:max.id,port:"value"},to:{node:random.id,port:"max"}},
-      {id:uid(),from:{node:random.id,port:"result"},to:{node:outputs.id,port:"column"}}
-    );
+function renderChess() {
+  if (typeof Chess === "undefined") {
+    $("game-container").textContent = "Le moteur d'échecs n'a pas pu être chargé. Vérifie ta connexion internet.";
+    return;
   }
 
-  else if (game === "racing") {
-    const throttle = {
-      id:uid(),type:"number",x:350,y:300,
-      config:{value:0.8}
-    };
+  const chess = new Chess();
+  let selected = null;
+  let legalTargets = [];
+  let thinking = false;
 
-    const brake = {
-      id:uid(),type:"number",x:350,y:400,
-      config:{value:0}
-    };
+  $("game-container").innerHTML = `
+    <div class="game-center">
+      <h2>♟ CHESS</h2>
+      <div id="chess-status" class="game-status">À toi de jouer avec les blancs.</div>
+      <div id="chess-board" class="game-board chess-board"></div>
+      <div class="game-buttons">
+        <button class="secondary" id="chess-reset">NEW GAME</button>
+        <button class="secondary" id="chess-undo">UNDO</button>
+      </div>
+      <p class="game-instructions">Clique sur une pièce blanche puis sur une case de destination.</p>
+    </div>`;
 
-    const steering = {
-      id:uid(),type:"number",x:350,y:500,
-      config:{value:0}
-    };
-
-    extra.push(throttle,brake,steering);
-
-    wires.push(
-      {id:uid(),from:{node:event.id,port:"next"},to:{node:outputs.id,port:"execIn"}},
-      {id:uid(),from:{node:throttle.id,port:"value"},to:{node:outputs.id,port:"throttle"}},
-      {id:uid(),from:{node:brake.id,port:"value"},to:{node:outputs.id,port:"brake"}},
-      {id:uid(),from:{node:steering.id,port:"value"},to:{node:outputs.id,port:"steering"}}
-    );
-  }
-
-  else if (game === "snake") {
-    const direction = {
-      id:uid(),type:"text",x:350,y:300,
-      config:{value:"right"}
-    };
-
-    extra.push(direction);
-
-    wires.push(
-      {id:uid(),from:{node:event.id,port:"next"},to:{node:outputs.id,port:"execIn"}},
-      {id:uid(),from:{node:direction.id,port:"value"},to:{node:outputs.id,port:"direction"}}
-    );
-  }
-
-  else if (game === "pingpong") {
-    const zeroX = {
-      id:uid(),type:"number",x:350,y:300,
-      config:{value:0}
-    };
-
-    const zeroY = {
-      id:uid(),type:"number",x:350,y:400,
-      config:{value:0}
-    };
-
-    extra.push(zeroX,zeroY);
-
-    wires.push(
-      {id:uid(),from:{node:event.id,port:"next"},to:{node:outputs.id,port:"execIn"}},
-      {id:uid(),from:{node:zeroX.id,port:"value"},to:{node:outputs.id,port:"targetX"}},
-      {id:uid(),from:{node:zeroY.id,port:"value"},to:{node:outputs.id,port:"targetY"}}
-    );
-  }
-
-  return {
-    format:BOT_FORMAT,
-    version:BOT_VERSION,
-    name,
-    game,
-    strategy,
-    nodes:[event,inputs,outputs,...extra],
-    connections:wires
-  };
-}
-
-function downloadDefaults() {
-  const pack = {
-    format:"NEONLAB_DEFAULT_BOTS",
-    version:1,
-    bots:[
-      makeDefaultBot("connect4","Random Column","random"),
-      makeDefaultBot("racing","Sunday Driver","steady"),
-      makeDefaultBot("snake","Straight Snake","simple"),
-      makeDefaultBot("pingpong","Center Keeper","center")
-    ]
+  const glyphs = {
+    w: {k:"♔",q:"♕",r:"♖",b:"♗",n:"♘",p:"♙"},
+    b: {k:"♚",q:"♛",r:"♜",b:"♝",n:"♞",p:"♟"}
   };
 
-  downloadJSON(pack,"default-bots.json");
-}
+  function draw() {
+    const root = $("chess-board");
+    root.innerHTML = "";
+    const board = chess.board();
 
-/* ============================================================
-   GAME PAGE
-   ============================================================ */
+    for (let row = 0; row < 8; row++) {
+      for (let col = 0; col < 8; col++) {
+        const square = String.fromCharCode(97 + col) + (8 - row);
+        const cell = document.createElement("button");
+        cell.className = "chess-cell " + ((row + col) % 2 ? "dark" : "light");
+        if (selected === square) cell.classList.add("selected");
+        if (legalTargets.includes(square)) cell.classList.add("legal");
 
-function selectGame(game) {
-  if (!GAME_INFO[game]) return;
-
-  stopGame();
-  selectedGame = game;
-  currentGame = game;
-
-  $("selected-game-title").textContent =
-    GAME_INFO[game].name.toUpperCase();
-
-  document.querySelectorAll(".page").forEach(p => p.classList.remove("active"));
-  $("game-page").classList.add("active");
-
-  if (game === "connect4") renderConnect4();
-  if (game === "snake") renderSnake();
-  if (game === "chess") renderChess();
-  if (game === "pingpong") renderPingPong();
-  if (game === "racing") renderRacing();
-}
-
-function stopGame() {
-  if (gameRuntime?.timer) clearInterval(gameRuntime.timer);
-  if (gameAnimation) cancelAnimationFrame(gameAnimation);
-  gameRuntime = null;
-  gameAnimation = null;
-}
-
-/* ============================================================
-   BUILT-IN BOT FALLBACKS
-   ============================================================ */
-
-function findSavedBot(game) {
-  return savedBots.find(b => b.game === game);
-}
-
-function chooseBotMove(game,state) {
-  const bot = findSavedBot(game);
-
-  if (bot) {
-    const result = executeBot(state,bot);
-    if (result.success) return result.outputs;
-  }
-
-  if (game === "connect4") {
-    const legal = state.availableColumns || [];
-    if (!legal.length) return {column:3};
-
-    // Win immediately if possible.
-    for (const column of legal) {
-      if (wouldWin(state.board,column,2)) return {column};
+        const piece = board[row][col];
+        if (piece) cell.textContent = glyphs[piece.color][piece.type];
+        cell.onclick = () => clickSquare(square);
+        root.appendChild(cell);
+      }
     }
 
-    // Block an immediate opponent win.
-    for (const column of legal) {
-      if (wouldWin(state.board,column,1)) return {column};
+    let status = chess.turn() === "w" ? "À toi de jouer." : "Le bot réfléchit...";
+    if (chess.in_checkmate()) status = "Échec et mat !";
+    else if (chess.in_draw()) status = "Match nul.";
+    else if (chess.in_check()) status += " Échec !";
+    $("chess-status").textContent = status;
+  }
+
+  function clickSquare(square) {
+    if (thinking || chess.turn() !== "w" || chess.game_over()) return;
+
+    if (selected && legalTargets.includes(square)) {
+      chess.move({from: selected, to: square, promotion: "q"});
+      selected = null;
+      legalTargets = [];
+      draw();
+      if (!chess.game_over()) setTimeout(botMove, 250);
+      return;
     }
 
-    const preferred = [3,2,4,1,5,0,6].filter(c => legal.includes(c));
-    return {column:preferred[0] ?? legal[0]};
+    const piece = chess.get(square);
+    if (piece && piece.color === "w") {
+      selected = square;
+      legalTargets = chess.moves({square, verbose: true}).map(m => m.to);
+    } else {
+      selected = null;
+      legalTargets = [];
+    }
+    draw();
   }
 
-  if (game === "snake") {
-    const options = state.availableDirections || ["right","down","left","up"];
-    const target = options.sort((a,b) => {
-      const distance = direction => {
-        const dx = direction === "left" ? -1 : direction === "right" ? 1 : 0;
-        const dy = direction === "up" ? -1 : direction === "down" ? 1 : 0;
-        return Math.abs(state.foodX-(state.headX+dx)) +
-          Math.abs(state.foodY-(state.headY+dy));
-      };
-      return distance(a)-distance(b);
-    });
-
-    return {direction:target[0] || "right"};
-  }
-
-  if (game === "racing") {
-    return {
-      throttle:state.front < 5 ? .25 : .8,
-      brake:state.front < 3 ? .7 : 0,
-      steering:Math.max(-1,Math.min(1,state.curve || 0))
+  function botMove() {
+    if (chess.game_over()) return;
+    thinking = true;
+    const moves = chess.moves({verbose: true});
+    const context = {
+      legalMoveCount: moves.length,
+      legalMoves: moves.map(m => m.from + m.to + (m.promotion || "")),
+      currentTurn: chess.turn(),
+      isCheck: chess.in_check(),
+      isCheckmate: chess.in_checkmate(),
+      board: chess.board().flat().map(p => p ? p.color + p.type : ""),
+      myKingX: 0,
+      myKingY: 0
     };
+
+    const output = runActiveBot("chess", context);
+    let index = Math.floor(Number(output.moveIndex));
+    if (!Number.isFinite(index) || index < 0 || index >= moves.length) index = Math.floor(Math.random() * moves.length);
+
+    // Le bot intégré privilégie les captures et les promotions.
+    if (!$("active-bot-select") || $("active-bot-select").value === "default") {
+      const captures = moves.map((m, i) => ({m, i})).filter(x => x.m.captured);
+      if (captures.length && Math.random() < .7) index = captures[Math.floor(Math.random() * captures.length)].i;
+    }
+
+    const move = moves[index];
+    if (move) chess.move({from: move.from, to: move.to, promotion: "q"});
+    thinking = false;
+    draw();
   }
 
-  if (game === "pingpong") {
-    return {
-      targetX:state.ballX,
-      targetY:state.ballY,
-      serve:false
-    };
+  function reset() {
+    chess.reset();
+    selected = null;
+    legalTargets = [];
+    thinking = false;
+    draw();
   }
 
-  return {};
+  $("chess-reset").onclick = reset;
+  $("chess-undo").onclick = () => {
+    chess.undo();
+    chess.undo();
+    selected = null;
+    legalTargets = [];
+    draw();
+  };
+
+  draw();
+  return () => {};
 }
 
-/* ============================================================
+/* =========================================================
    CONNECT FOUR
-   ============================================================ */
+   ========================================================= */
 
-function createConnectBoard() {
-  return Array.from({length:6},()=>Array(7).fill(0));
-}
+function renderConnect4() {
+  let board, turn, finished, busy;
 
-function connectWin(board,player) {
-  const directions = [[0,1],[1,0],[1,1],[1,-1]];
+  $("game-container").innerHTML = `
+    <div class="game-center">
+      <h2>🟡 PUISSANCE 4</h2>
+      <div id="connect-status" class="game-status">Tu joues en jaune.</div>
+      <div id="connect-board" class="game-board connect-board"></div>
+      <div class="game-buttons">
+        <button class="secondary" id="connect-reset">NEW GAME</button>
+      </div>
+      <p class="game-instructions">Clique sur une colonne pour y déposer un jeton.</p>
+    </div>`;
 
-  for (let r=0;r<6;r++) {
-    for (let c=0;c<7;c++) {
-      for (const [dr,dc] of directions) {
-        let count = 0;
+  function reset() {
+    board = Array.from({length: 6}, () => Array(7).fill(0));
+    turn = 1;
+    finished = false;
+    busy = false;
+    draw();
+  }
 
-        for (let k=0;k<4;k++) {
-          const rr=r+dr*k, cc=c+dc*k;
-          if (
-            rr>=0 && rr<6 &&
-            cc>=0 && cc<7 &&
-            board[rr][cc]===player
-          ) count++;
-        }
-
-        if (count===4) return true;
+  function draw() {
+    const root = $("connect-board");
+    root.innerHTML = "";
+    for (let r = 0; r < 6; r++) {
+      for (let c = 0; c < 7; c++) {
+        const cell = document.createElement("button");
+        cell.className = "connect-cell " + (board[r][c] === 1 ? "p1" : board[r][c] === 2 ? "p2" : "");
+        cell.title = "Column " + (c + 1);
+        cell.onclick = () => play(c);
+        root.appendChild(cell);
       }
     }
   }
 
-  return false;
-}
-
-function dropConnect(board,column,player) {
-  for (let r=5;r>=0;r--) {
-    if (!board[r][column]) {
-      board[r][column]=player;
-      return true;
+  function drop(column, player) {
+    for (let row = 5; row >= 0; row--) {
+      if (!board[row][column]) {
+        board[row][column] = player;
+        return true;
+      }
     }
-  }
-  return false;
-}
-
-function wouldWin(board,column,player) {
-  const copy = deepClone(board);
-  return dropConnect(copy,column,player) && connectWin(copy,player);
-}
-
-function renderConnect4() {
-  const root = $("game-container");
-
-  root.innerHTML = `
-    <div style="text-align:center">
-      <h3>PUISSANCE 4</h3>
-      <p class="game-status" id="connect-status">À toi de jouer — jaune</p>
-      <div id="connect-board" class="game-board"></div>
-      <div class="game-controls">
-        <button class="primary-button" id="connect-reset">RESTART</button>
-        <button class="secondary-button" id="connect-bot">PLAY AGAINST BOT</button>
-      </div>
-    </div>`;
-
-  gameRuntime = {
-    board:createConnectBoard(),
-    turn:1,
-    finished:false,
-    botEnabled:true,
-    timer:null
-  };
-
-  const runtime = gameRuntime;
-
-  function draw() {
-    const board = $("connect-board");
-    board.innerHTML = "";
-
-    runtime.board.forEach((row,r) => row.forEach((value,c) => {
-      const cell = document.createElement("button");
-      cell.className = "connect-cell" + (value===1 ? " p1" : value===2 ? " p2" : "");
-      cell.title = `Column ${c+1}`;
-      cell.onclick = () => play(c);
-      board.appendChild(cell);
-    }));
+    return false;
   }
 
-  function stateFor(player) {
-    const available = runtime.board[0]
-      .map((v,i)=>v===0?i:-1)
-      .filter(i=>i>=0);
+  function winner(player) {
+    const dirs = [[0,1],[1,0],[1,1],[1,-1]];
+    for (let r = 0; r < 6; r++) for (let c = 0; c < 7; c++) {
+      for (const [dr,dc] of dirs) {
+        let count = 0;
+        for (let k = 0; k < 4; k++) {
+          const rr = r + dr*k, cc = c + dc*k;
+          if (rr >= 0 && rr < 6 && cc >= 0 && cc < 7 && board[rr][cc] === player) count++;
+        }
+        if (count === 4) return true;
+      }
+    }
+    return false;
+  }
 
+  function available() {
+    return board[0].map((v,i) => v === 0 ? i : -1).filter(i => i >= 0);
+  }
+
+  function contextForBot() {
+    const legal = available();
+    let threats = 0;
+    legal.forEach(c => {
+      const copy = board.map(row => row.slice());
+      for (let r = 5; r >= 0; r--) if (!copy[r][c]) { copy[r][c] = 1; break; }
+      const old = board;
+      board = copy;
+      if (winner(1)) threats++;
+      board = old;
+    });
     return {
-      board:deepClone(runtime.board),
-      availableColumns:available,
-      currentPlayer:player,
-      centerColumn:3,
-      winningMoves:available.filter(c=>wouldWin(runtime.board,c,player)),
-      opponentThreats:available.filter(c=>wouldWin(runtime.board,c,player===1?2:1))
+      availableColumns: legal,
+      board: board.flat(),
+      currentPlayer: 2,
+      winningColumns: legal.filter(c => {
+        const copy = board.map(row => row.slice());
+        for (let r = 5; r >= 0; r--) if (!copy[r][c]) { copy[r][c] = 2; break; }
+        const old = board;
+        board = copy;
+        const win = winner(2);
+        board = old;
+        return win;
+      }),
+      opponentThreats: threats
     };
   }
 
-  function finish(message) {
-    runtime.finished = true;
+  function botTurn() {
+    if (finished) return;
+    busy = true;
+    const context = contextForBot();
+    let output = runActiveBot("connect4", context);
+    let column = Math.round(Number(output.column));
+
+    if ($("active-bot-select")?.value === "default") {
+      const wins = context.winningColumns;
+      const blocks = context.availableColumns.filter(c => {
+        const copy = board.map(row => row.slice());
+        for (let r = 5; r >= 0; r--) if (!copy[r][c]) { copy[r][c] = 1; break; }
+        const old = board; board = copy;
+        const win = winner(1);
+        board = old;
+        return win;
+      });
+      if (wins.length) column = wins[0];
+      else if (blocks.length) column = blocks[0];
+      else column = context.availableColumns.includes(3) ? 3 :
+        context.availableColumns[Math.floor(Math.random() * context.availableColumns.length)];
+    }
+
+    if (!context.availableColumns.includes(column)) {
+      const legal = context.availableColumns;
+      column = legal[Math.floor(Math.random() * legal.length)];
+    }
+
+    if (column !== undefined) drop(column, 2);
+    draw();
+    if (winner(2)) end("Le bot gagne !");
+    else if (!available().length) end("Match nul !");
+    else {
+      turn = 1;
+      $("connect-status").textContent = "À toi de jouer — jaune.";
+      busy = false;
+    }
+  }
+
+  function end(message) {
+    finished = true;
+    busy = false;
     $("connect-status").textContent = message;
   }
 
   function play(column) {
-    if (runtime.finished || runtime.turn!==1) return;
-    if (!dropConnect(runtime.board,column,1)) return;
-
+    if (finished || busy || turn !== 1) return;
+    if (!drop(column, 1)) return;
     draw();
 
-    if (connectWin(runtime.board,1)) {
-      finish("Tu as gagné !");
-      return;
-    }
+    if (winner(1)) return end("Tu as gagné !");
+    if (!available().length) return end("Match nul !");
 
-    if (runtime.board[0].every(Boolean)) {
-      finish("Match nul !");
-      return;
-    }
-
-    runtime.turn=2;
-    $("connect-status").textContent="Le bot réfléchit…";
-
-    setTimeout(() => {
-      if (runtime.finished) return;
-
-      const state=stateFor(2);
-      const decision=runtime.botEnabled
-        ? chooseBotMove("connect4",state)
-        : {column:Math.floor(Math.random()*7)};
-
-      const selected=Number(decision.column);
-      const legal=state.availableColumns;
-      const columnToPlay=legal.includes(selected)
-        ? selected
-        : legal[Math.floor(Math.random()*legal.length)];
-
-      if (columnToPlay===undefined) {
-        finish("Match nul !");
-        return;
-      }
-
-      dropConnect(runtime.board,columnToPlay,2);
-      draw();
-
-      if (connectWin(runtime.board,2)) {
-        finish("Le bot a gagné.");
-        return;
-      }
-
-      if (runtime.board[0].every(Boolean)) {
-        finish("Match nul !");
-        return;
-      }
-
-      runtime.turn=1;
-      $("connect-status").textContent="À toi de jouer — jaune";
-    },350);
+    turn = 2;
+    $("connect-status").textContent = "Le bot joue...";
+    busy = true;
+    setTimeout(botTurn, 300);
   }
 
-  $("connect-reset").onclick=renderConnect4;
-  $("connect-bot").onclick=()=>{
-    runtime.botEnabled=!runtime.botEnabled;
-    $("connect-bot").textContent=runtime.botEnabled ? "PLAY AGAINST BOT" : "RANDOM BOT";
-  };
-
-  draw();
+  $("connect-reset").onclick = reset;
+  reset();
 }
 
-/* ============================================================
+/* =========================================================
    SNAKE
-   ============================================================ */
+   ========================================================= */
 
 function renderSnake() {
-  const root=$("game-container");
-
-  root.innerHTML=`
-    <div style="text-align:center">
-      <h3>SNAKE</h3>
-      <p class="game-status" id="snake-score">Score : 0</p>
-      <canvas id="snake-canvas" class="game-canvas" width="440" height="440"></canvas>
-      <div class="game-controls">
-        <button class="primary-button" id="snake-start">START / RESTART</button>
-        <button class="secondary-button" id="snake-mode">PLAY WITH BOT</button>
+  $("game-container").innerHTML = `
+    <div class="game-center">
+      <h2>🐍 SNAKE</h2>
+      <div id="snake-status" class="game-status">Score : 0</div>
+      <canvas id="snake-canvas" width="480" height="480"></canvas>
+      <div class="game-buttons">
+        <button class="primary" id="snake-start">START / RESTART</button>
+        <button class="secondary" id="snake-mode">MODE : PLAYER</button>
       </div>
-      <p style="color:var(--muted);font-size:11px">Flèches du clavier pour jouer manuellement.</p>
+      <p class="game-instructions">Flèches du clavier pour jouer. Le mode BOT laisse ton IA contrôler le serpent.</p>
     </div>`;
 
-  const canvas=$("snake-canvas");
-  const ctx=canvas.getContext("2d");
-  const cell=20;
+  const canvas = $("snake-canvas");
+  const ctx = canvas.getContext("2d");
+  const cell = 24;
+  const size = 20;
+  let snake, food, direction, score, timer, running, botMode = false;
 
-  gameRuntime={
-    snake:[{x:10,y:10},{x:9,y:10},{x:8,y:10}],
-    food:{x:15,y:10},
-    direction:"right",
-    score:0,
-    bot:false,
-    running:false,
-    timer:null
-  };
-
-  const runtime=gameRuntime;
-
-  function spawnFood() {
-    let food;
-    do {
-      food={
-        x:Math.floor(Math.random()*22),
-        y:Math.floor(Math.random()*22)
-      };
-    } while(runtime.snake.some(p=>p.x===food.x&&p.y===food.y));
-
-    runtime.food=food;
+  function reset() {
+    clearInterval(timer);
+    snake = [{x:9,y:10},{x:8,y:10},{x:7,y:10}];
+    direction = 1;
+    food = {x:15,y:10};
+    score = 0;
+    running = true;
+    draw();
+    $("snake-status").textContent = "Score : 0";
+    timer = setInterval(step, 125);
   }
 
   function draw() {
-    ctx.fillStyle="#07130f";
-    ctx.fillRect(0,0,440,440);
-
-    ctx.strokeStyle="#12271f";
-    for(let i=0;i<=22;i++) {
-      ctx.beginPath();
-      ctx.moveTo(i*cell,0);
-      ctx.lineTo(i*cell,440);
-      ctx.stroke();
-
-      ctx.beginPath();
-      ctx.moveTo(0,i*cell);
-      ctx.lineTo(440,i*cell);
-      ctx.stroke();
+    ctx.fillStyle = "#07130f";
+    ctx.fillRect(0,0,480,480);
+    ctx.strokeStyle = "#142a21";
+    for (let i=0;i<=20;i++) {
+      ctx.beginPath();ctx.moveTo(i*cell,0);ctx.lineTo(i*cell,480);ctx.stroke();
+      ctx.beginPath();ctx.moveTo(0,i*cell);ctx.lineTo(480,i*cell);ctx.stroke();
     }
-
-    ctx.fillStyle="#ff526d";
-    ctx.fillRect(runtime.food.x*cell+3,runtime.food.y*cell+3,14,14);
-
-    runtime.snake.forEach((p,i)=>{
-      ctx.fillStyle=i===0?"#b4fff7":"#35e6db";
-      ctx.fillRect(p.x*cell+2,p.y*cell+2,16,16);
+    ctx.fillStyle = "#ff5575";
+    ctx.fillRect(food.x*cell+3,food.y*cell+3,18,18);
+    snake.forEach((p,i) => {
+      ctx.fillStyle = i===0 ? "#a1ffe5" : "#35cba2";
+      ctx.fillRect(p.x*cell+2,p.y*cell+2,20,20);
     });
   }
 
-  function state() {
-    const head=runtime.snake[0];
-
-    const directions=["up","down","left","right"];
-    const available=directions.filter(d=>{
-      const p=nextPosition(head,d);
-      return p.x>=0&&p.x<22&&p.y>=0&&p.y<22&&
-        !runtime.snake.slice(0,-1).some(s=>s.x===p.x&&s.y===p.y);
+  function safeDirections() {
+    return [0,1,2,3].filter(d => {
+      if ((d+2)%4 === direction) return false;
+      const vectors = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0}];
+      const v = vectors[d];
+      const p = {x:snake[0].x+v.x,y:snake[0].y+v.y};
+      return p.x>=0 && p.x<size && p.y>=0 && p.y<size &&
+        !snake.slice(0,-1).some(s=>s.x===p.x&&s.y===p.y);
     });
-
-    return {
-      headX:head.x,
-      headY:head.y,
-      foodX:runtime.food.x,
-      foodY:runtime.food.y,
-      distanceFood:Math.abs(head.x-runtime.food.x)+Math.abs(head.y-runtime.food.y),
-      wallFront:runtime.direction==="right"?21-head.x:
-        runtime.direction==="left"?head.x:
-        runtime.direction==="down"?21-head.y:head.y,
-      wallLeft:head.x,
-      wallRight:21-head.x,
-      body:deepClone(runtime.snake),
-      availableDirections:available
-    };
   }
 
-  function nextPosition(head,direction) {
-    const delta={
-      up:{x:0,y:-1},
-      down:{x:0,y:1},
-      left:{x:-1,y:0},
-      right:{x:1,y:0}
+  function chooseBotDirection() {
+    const available = safeDirections();
+    const context = {
+      headX: snake[0].x, headY: snake[0].y,
+      foodX: food.x, foodY: food.y,
+      direction, body: snake.map(p=>[p.x,p.y]),
+      availableDirections: available
     };
+    const output = runActiveBot("snake", context);
+    let choice = Math.round(Number(output.direction));
 
-    return {
-      x:head.x+delta[direction].x,
-      y:head.y+delta[direction].y
-    };
+    if ($("active-bot-select")?.value === "default") {
+      const toward = [];
+      if (food.x > snake[0].x) toward.push(1);
+      if (food.x < snake[0].x) toward.push(3);
+      if (food.y > snake[0].y) toward.push(2);
+      if (food.y < snake[0].y) toward.push(0);
+      choice = toward.find(d=>available.includes(d)) ?? available[0];
+    }
+    if (!available.includes(choice)) choice = available[0];
+    if (choice !== undefined) direction = choice;
   }
 
   function step() {
-    if(!runtime.running) return;
+    if (!running) return;
+    if (botMode) chooseBotDirection();
 
-    if(runtime.bot) {
-      const result=chooseBotMove("snake",state());
-      const next=result.direction;
+    const vectors = [{x:0,y:-1},{x:1,y:0},{x:0,y:1},{x:-1,y:0}];
+    const v = vectors[direction];
+    const head = {x:snake[0].x+v.x,y:snake[0].y+v.y};
 
-      if(next && (
-        (runtime.direction==="up"&&next!=="down") ||
-        (runtime.direction==="down"&&next!=="up") ||
-        (runtime.direction==="left"&&next!=="right") ||
-        (runtime.direction==="right"&&next!=="left")
-      )) {
-        runtime.direction=next;
-      }
-    }
-
-    const head=nextPosition(runtime.snake[0],runtime.direction);
-    const eating=head.x===runtime.food.x&&head.y===runtime.food.y;
-
-    const collisionBody=eating ? runtime.snake : runtime.snake.slice(0,-1);
-
-    if(
-      head.x<0||head.x>=22||
-      head.y<0||head.y>=22||
-      collisionBody.some(p=>p.x===head.x&&p.y===head.y)
-    ) {
-      runtime.running=false;
-      clearInterval(runtime.timer);
-      $("snake-score").textContent=`Game Over — Score : ${runtime.score}`;
+    if (head.x<0 || head.x>=size || head.y<0 || head.y>=size ||
+        snake.slice(0,-1).some(p=>p.x===head.x&&p.y===head.y)) {
+      running = false;
+      clearInterval(timer);
+      $("snake-status").textContent = "Game over — score : " + score;
       return;
     }
 
-    runtime.snake.unshift(head);
+    snake.unshift(head);
+    if (head.x===food.x && head.y===food.y) {
+      score++;
+      do {
+        food = {x:Math.floor(Math.random()*size),y:Math.floor(Math.random()*size)};
+      } while (snake.some(p=>p.x===food.x&&p.y===food.y));
+      $("snake-status").textContent = "Score : " + score;
+    } else snake.pop();
 
-    if(eating) {
-      runtime.score++;
-      spawnFood();
-    } else {
-      runtime.snake.pop();
-    }
-
-    $("snake-score").textContent=`Score : ${runtime.score}`;
     draw();
   }
 
-  function start() {
-    clearInterval(runtime.timer);
-    runtime.snake=[{x:10,y:10},{x:9,y:10},{x:8,y:10}];
-    runtime.direction="right";
-    runtime.score=0;
-    runtime.running=true;
-    spawnFood();
-    $("snake-score").textContent="Score : 0";
-    draw();
-    runtime.timer=setInterval(step,115);
-  }
-
-  document.onkeydown=e=>{
-    if(!runtime.running||runtime.bot) return;
-
-    const keys={
-      ArrowUp:"up",
-      ArrowDown:"down",
-      ArrowLeft:"left",
-      ArrowRight:"right"
-    };
-
-    const next=keys[e.key];
-    if(!next) return;
-
-    const opposite={
-      up:"down",down:"up",left:"right",right:"left"
-    };
-
-    if(next!==opposite[runtime.direction]) {
-      runtime.direction=next;
-      e.preventDefault();
-    }
+  document.onkeydown = event => {
+    if (currentPage !== "game" || currentGame !== "snake" || botMode) return;
+    const map = {ArrowUp:0,ArrowRight:1,ArrowDown:2,ArrowLeft:3};
+    if (map[event.key] === undefined) return;
+    if ((map[event.key]+2)%4 === direction) return;
+    direction = map[event.key];
+    event.preventDefault();
   };
 
-  $("snake-start").onclick=start;
-  $("snake-mode").onclick=()=>{
-    runtime.bot=!runtime.bot;
-    $("snake-mode").textContent=runtime.bot?"PLAY MANUALLY":"PLAY WITH BOT";
-    start();
+  $("snake-start").onclick = reset;
+  $("snake-mode").onclick = () => {
+    botMode = !botMode;
+    $("snake-mode").textContent = "MODE : " + (botMode ? "BOT" : "PLAYER");
+    reset();
   };
+  reset();
 
-  start();
+  return () => {
+    clearInterval(timer);
+    document.onkeydown = null;
+  };
 }
 
-/* ============================================================
-   CHESS
-   ============================================================ */
+/* =========================================================
+   3D PING PONG
+   ========================================================= */
 
-function renderChess() {
-  const root=$("game-container");
-
-  root.innerHTML=`
-    <div style="text-align:center">
-      <h3>CHESS</h3>
-      <p class="game-status" id="chess-status">Chargement du jeu…</p>
-      <div id="chess-board" style="display:grid;grid-template-columns:repeat(8,minmax(30px,55px));width:max-content;max-width:100%;margin:20px auto;border:4px solid #26344a"></div>
-      <div class="game-controls">
-        <button class="primary-button" id="chess-reset">NEW GAME</button>
-        <button class="secondary-button" id="chess-bot">PLAY AGAINST BOT</button>
-      </div>
-    </div>`;
-
-  if(typeof window.Chess!=="function") {
-    $("chess-status").textContent="Le moteur d'échecs n'est pas chargé.";
+function renderPingPong() {
+  if (!window.THREE) {
+    $("game-container").textContent = "Three.js n'a pas pu être chargé. Vérifie ta connexion.";
     return;
   }
 
-  const chess=new Chess();
-  gameRuntime={chess,bot:true};
-
-  const unicode={
-    wp:"♙",wr:"♖",wn:"♘",wb:"♗",wq:"♕",wk:"♔",
-    bp:"♟",br:"♜",bn:"♞",bb:"♝",bq:"♛",bk:"♚"
-  };
-
-  function draw() {
-    const board=$("chess-board");
-    board.innerHTML="";
-
-    const position=chess.board();
-
-    position.forEach((row,r)=>row.forEach((piece,c)=>{
-      const square=document.createElement("button");
-      square.style.cssText=`
-        width:100%;aspect-ratio:1;border:0;
-        background:${(r+c)%2===0?"#e2d5bb":"#78916d"};
-        font-size:clamp(20px,4vw,37px);
-        color:${piece?.color==="w"?"#fff":"#101018"};
-        text-shadow:0 1px 3px #333;
-      `;
-
-      square.textContent=piece?unicode[piece.color+piece.type]:"";
-      square.onclick=()=>playSquare(r,c);
-      board.append(square);
-    }));
-
-    $("chess-status").textContent=chess.isGameOver()
-      ? "Partie terminée."
-      : chess.turn()==="w"?"À toi de jouer — blanc":"Le bot joue — noir";
-  }
-
-  let selected=null;
-
-  function playSquare(r,c) {
-    if(chess.turn()!=="w"||chess.isGameOver()) return;
-
-    const files="abcdefgh";
-    const square=files[c]+(8-r);
-
-    if(!selected) {
-      selected=square;
-      return;
-    }
-
-    const move=chess.move({from:selected,to:square,promotion:"q"});
-    selected=null;
-
-    if(move) {
-      draw();
-      if(!chess.isGameOver()) setTimeout(botMove,350);
-    }
-  }
-
-  function botMove() {
-    if(chess.isGameOver()) return;
-
-    const legal=chess.moves({verbose:true});
-    if(!legal.length) return;
-
-    const state={
-      legalMoves:legal.map(m=>m.from+m.to),
-      currentTurn:chess.turn()==="w"?1:2,
-      isCheck:chess.isCheck(),
-      whitePieces:chess.board().flat().filter(p=>p?.color==="w").length,
-      blackPieces:chess.board().flat().filter(p=>p?.color==="b").length,
-      moveCount:chess.history().length,
-      board:chess.board()
-    };
-
-    const decision=chooseBotMove("chess",state);
-    const selectedMove=legal.find(m=>
-      m.from+m.to===decision.move
-    );
-
-    const move=selectedMove || legal[Math.floor(Math.random()*legal.length)];
-    chess.move({from:move.from,to:move.to,promotion:"q"});
-    draw();
-  }
-
-  $("chess-reset").onclick=()=>{
-    chess.reset();
-    selected=null;
-    draw();
-  };
-
-  $("chess-bot").onclick=()=>{
-    gameRuntime.bot=!gameRuntime.bot;
-    $("chess-bot").textContent=gameRuntime.bot?"PLAY AGAINST BOT":"BOT DISABLED";
-  };
-
-  draw();
-}
-
-/* ============================================================
-   THREE.JS HELPERS
-   ============================================================ */
-
-function createThreeScene(host) {
-  if(!window.THREE) {
-    host.textContent="Three.js n'est pas chargé.";
-    return null;
-  }
-
-  const scene=new THREE.Scene();
-  const camera=new THREE.PerspectiveCamera(
-    55,
-    host.clientWidth/Math.max(1,host.clientHeight),
-    .1,
-    200
-  );
-
-  const renderer=new THREE.WebGLRenderer({antialias:true});
-  renderer.setPixelRatio(Math.min(window.devicePixelRatio||1,2));
-  renderer.setSize(host.clientWidth,host.clientHeight);
-  host.appendChild(renderer.domElement);
-
-  scene.add(new THREE.HemisphereLight(0xffffff,0x334455,2));
-
-  const light=new THREE.DirectionalLight(0xffffff,1.5);
-  light.position.set(4,10,5);
-  scene.add(light);
-
-  return {scene,camera,renderer,host};
-}
-
-/* ============================================================
-   3D PING PONG
-   ============================================================ */
-
-function renderPingPong() {
-  const root=$("game-container");
-
-  root.innerHTML=`
-    <div style="text-align:center">
-      <h3>3D PING PONG</h3>
-      <p class="game-status" id="pong-status">Déplace ta raquette avec les flèches.</p>
-      <div id="pong-scene" style="height:420px;max-width:850px;margin:auto"></div>
-      <div class="game-controls">
-        <button class="primary-button" id="pong-start">RESTART</button>
-        <button class="secondary-button" id="pong-bot">BOT OPPONENT</button>
-      </div>
+  $("game-container").innerHTML = `
+    <div class="game-center">
+      <h2>🏓 3D PING PONG</h2>
+      <div id="pong-status" class="game-status">Toi : 0 — Bot : 0</div>
+      <div id="pong-host"></div>
+      <p class="game-instructions">Déplace ta raquette avec les flèches ou ZQSD. Le bot contrôle l'autre côté.</p>
+      <div class="game-buttons"><button class="secondary" id="pong-reset">RESET MATCH</button></div>
     </div>`;
 
-  const host=$("pong-scene");
-  const three=createThreeScene(host);
-  if(!three) return;
+  const host = $("pong-host");
+  const scene = new THREE.Scene();
+  scene.background = new THREE.Color(0x07121b);
 
-  const {scene,camera,renderer}=three;
-  camera.position.set(0,7,10);
-  camera.lookAt(0,0,0);
+  const camera = new THREE.PerspectiveCamera(48, host.clientWidth / host.clientHeight, .1, 100);
+  camera.position.set(0, 8, 15);
+  camera.lookAt(0, 0, 0);
 
-  const table=new THREE.Mesh(
-    new THREE.BoxGeometry(5,.2,8),
-    new THREE.MeshStandardMaterial({color:0x176b9a})
+  const renderer = new THREE.WebGLRenderer({antialias:true});
+  renderer.setPixelRatio(Math.min(devicePixelRatio, 2));
+  renderer.setSize(host.clientWidth, host.clientHeight);
+  host.appendChild(renderer.domElement);
+
+  scene.add(new THREE.HemisphereLight(0xffffff,0x263b56,2));
+  const light = new THREE.DirectionalLight(0xffffff,1.5);
+  light.position.set(3,10,5);
+  scene.add(light);
+
+  const table = new THREE.Mesh(
+    new THREE.BoxGeometry(9,.3,13),
+    new THREE.MeshStandardMaterial({color:0x176a91,roughness:.65})
   );
   scene.add(table);
 
-  const net=new THREE.Mesh(
-    new THREE.BoxGeometry(5,.35,.08),
-    new THREE.MeshStandardMaterial({color:0xffffff})
+  const floor = new THREE.Mesh(
+    new THREE.PlaneGeometry(30,30),
+    new THREE.MeshStandardMaterial({color:0x101b29})
   );
-  net.position.set(0,.25,0);
+  floor.rotation.x=-Math.PI/2;
+  floor.position.y=-.3;
+  scene.add(floor);
+
+  const net = new THREE.Mesh(
+    new THREE.BoxGeometry(9,.55,.12),
+    new THREE.MeshStandardMaterial({color:0xe9f2ff})
+  );
+  net.position.y=.42;
   scene.add(net);
 
-  const ball=new THREE.Mesh(
-    new THREE.SphereGeometry(.15,24,24),
-    new THREE.MeshStandardMaterial({color:0xffe14a})
-  );
-  ball.position.set(0,.5,2);
-  scene.add(ball);
-
-  function makePaddle(color) {
-    const paddle=new THREE.Mesh(
-      new THREE.BoxGeometry(1,.18,.65),
-      new THREE.MeshStandardMaterial({color})
+  function makePaddle(color,z) {
+    const paddle = new THREE.Mesh(
+      new THREE.BoxGeometry(1.7,.3,.65),
+      new THREE.MeshStandardMaterial({color,roughness:.35})
     );
+    paddle.position.set(0,.6,z);
     scene.add(paddle);
     return paddle;
   }
 
-  const player=makePaddle(0x35e6db);
-  const opponent=makePaddle(0xff536f);
+  const human = makePaddle(0x42e5dc,5.4);
+  const bot = makePaddle(0xff6682,-5.4);
 
-  player.position.set(0,.3,3.2);
-  opponent.position.set(0,.3,-3.2);
+  const ball = new THREE.Mesh(
+    new THREE.SphereGeometry(.24,24,24),
+    new THREE.MeshStandardMaterial({color:0xffdf65})
+  );
+  ball.position.set(0,1,0);
+  scene.add(ball);
 
-  gameRuntime={
-    ball,player,opponent,
-    vx:.045,vy:.025,vz:-.06,
-    score:0,
-    bot:true,
-    running:true
-  };
+  let bx=0, by=1, bz=0, vx=.09, vy=.035, vz=.16;
+  let humanScore=0, botScore=0, lastTime=0, raf=0;
+  let keys={};
 
-  const runtime=gameRuntime;
-
-  function resetBall() {
-    ball.position.set((Math.random()-.5)*2,.5,0);
-    runtime.vx=(Math.random()-.5)*.08;
-    runtime.vz=Math.random()>.5?.065:-.065;
+  function serve(direction=1) {
+    bx=0;by=1;bz=0;
+    vx=(Math.random()-.5)*.12;
+    vy=.04;
+    vz=.17*direction;
   }
 
-  function update() {
-    if(!runtime.running) return;
+  function reset() {
+    humanScore=0;botScore=0;
+    human.position.x=0;human.position.z=5.4;
+    bot.position.x=0;bot.position.z=-5.4;
+    serve(1);
+    updateScore();
+  }
 
-    ball.position.x+=runtime.vx;
-    ball.position.y+=runtime.vy;
-    ball.position.z+=runtime.vz;
+  function updateScore() {
+    $("pong-status").textContent=`Toi : ${humanScore} — Bot : ${botScore}`;
+  }
 
-    if(ball.position.x>2.35||ball.position.x< -2.35) {
-      runtime.vx*=-1;
-    }
+  function onKeyDown(e) {
+    keys[e.key.toLowerCase()]=true;
+  }
+  function onKeyUp(e) {
+    keys[e.key.toLowerCase()]=false;
+  }
+  window.addEventListener("keydown",onKeyDown);
+  window.addEventListener("keyup",onKeyUp);
 
-    if(ball.position.y<.2||ball.position.y>2) {
-      runtime.vy*=-1;
-    }
+  function animate(time) {
+    raf=requestAnimationFrame(animate);
+    const dt=Math.min((time-lastTime)/16.67 || 1,2);
+    lastTime=time;
 
-    const state={
-      ballX:ball.position.x,
-      ballY:ball.position.y,
-      ballZ:ball.position.z,
-      ballVelocityX:runtime.vx,
-      ballVelocityY:runtime.vy,
-      ballVelocityZ:runtime.vz,
-      paddleX:player.position.x,
-      paddleY:player.position.z,
-      ballApproaching:runtime.vz>0
+    if (keys.arrowleft || keys.q || keys.a) human.position.x-=.16*dt;
+    if (keys.arrowright || keys.d) human.position.x+=.16*dt;
+    if (keys.arrowup || keys.z || keys.w) human.position.z-=.16*dt;
+    if (keys.arrowdown || keys.s) human.position.z+=.16*dt;
+
+    human.position.x=THREE.MathUtils.clamp(human.position.x,-3.5,3.5);
+    human.position.z=THREE.MathUtils.clamp(human.position.z,3.7,6.1);
+
+    const context={
+      ballX:bx,ballY:by,ballZ:bz,
+      ballVelocityX:vx,ballVelocityY:vy,ballVelocityZ:vz,
+      paddleX:bot.position.x,paddleY:bot.position.z,
+      ballApproaching:vz<0
     };
+    const output=runActiveBot("pingpong",context);
+    let tx=Number(output.paddleTargetX);
+    let ty=Number(output.paddleTargetY);
 
-    const decision=runtime.bot
-      ? chooseBotMove("pingpong",state)
-      : {};
-
-    const target=Number(decision.targetX);
-    if(runtime.bot) {
-      opponent.position.x+=(Math.max(-2,Math.min(2,ball.position.x))-opponent.position.x)*.06;
+    if ($("active-bot-select")?.value==="default") {
+      const timeToPaddle=Math.max(0,(-5.05-bz)/(vz||-.01));
+      tx=bx+vx*timeToPaddle;
+      ty=-5.4;
     }
 
-    player.position.x=Math.max(-2,Math.min(2,player.position.x));
+    if (!Number.isFinite(tx)) tx=0;
+    bot.position.x=THREE.MathUtils.clamp(bot.position.x+(THREE.MathUtils.clamp(tx,-3.5,3.5)-bot.position.x)*.09*dt,-3.5,3.5);
+    bot.position.z=THREE.MathUtils.clamp(bot.position.z+(THREE.MathUtils.clamp(ty,-6.1,-3.7)-bot.position.z)*.09*dt,-6.1,-3.7);
 
-    if(
-      ball.position.z>2.8 &&
-      ball.position.z<3.7 &&
-      Math.abs(ball.position.x-player.position.x)<.75
-    ) {
-      runtime.vz=-Math.abs(runtime.vz);
-      runtime.vx+=(ball.position.x-player.position.x)*.025;
+    bx+=vx*dt;
+    by+=vy*dt;
+    bz+=vz*dt;
+
+    if (bx>4.2 || bx< -4.2) vx*=-1;
+    if (by>3.4) vy*=-1;
+    if (by<.4) vy=Math.abs(vy);
+
+    if (vz>0 && bz>4.95 && Math.abs(bx-human.position.x)<1.15 && Math.abs(by-human.position.y)<1.2) {
+      vz=-Math.abs(vz);
+      vx+=(bx-human.position.x)*.035;
+      vy+=(by-.7)*.025;
     }
 
-    if(
-      ball.position.z< -2.8 &&
-      ball.position.z> -3.7 &&
-      Math.abs(ball.position.x-opponent.position.x)<.75
-    ) {
-      runtime.vz=Math.abs(runtime.vz);
-      runtime.vx+=(ball.position.x-opponent.position.x)*.025;
+    if (vz<0 && bz< -4.95 && Math.abs(bx-bot.position.x)<1.15 && Math.abs(by-bot.position.y)<1.2) {
+      vz=Math.abs(vz);
+      vx+=(bx-bot.position.x)*.035;
+      vy+=(by-.7)*.025;
     }
 
-    if(Math.abs(ball.position.z)>4.5) {
-      runtime.score++;
-      $("pong-status").textContent=`Point ! Score : ${runtime.score}`;
-      resetBall();
-    }
+    if (bz>7) { botScore++; updateScore(); serve(-1); }
+    if (bz< -7) { humanScore++; updateScore(); serve(1); }
 
+    ball.position.set(bx,by,bz);
     renderer.render(scene,camera);
-    gameAnimation=requestAnimationFrame(update);
   }
 
-  function restart() {
-    runtime.score=0;
-    resetBall();
-  }
+  const resizeObserver=new ResizeObserver(()=>{
+    if(!host.clientWidth)return;
+    camera.aspect=host.clientWidth/host.clientHeight;
+    camera.updateProjectionMatrix();
+    renderer.setSize(host.clientWidth,host.clientHeight);
+  });
+  resizeObserver.observe(host);
 
-  document.onkeydown=e=>{
-    if(e.key==="ArrowLeft") player.position.x-=.25;
-    if(e.key==="ArrowRight") player.position.x+=.25;
-    if(e.key==="ArrowUp") player.position.z-=.2;
-    if(e.key==="ArrowDown") player.position.z+=.2;
+  $("pong-reset").onclick=reset;
+  reset();
+  animate(0);
+
+  return ()=>{
+    cancelAnimationFrame(raf);
+    resizeObserver.disconnect();
+    window.removeEventListener("keydown",onKeyDown);
+    window.removeEventListener("keyup",onKeyUp);
+    renderer.dispose();
   };
-
-  $("pong-start").onclick=restart;
-  $("pong-bot").onclick=()=>{
-    runtime.bot=!runtime.bot;
-    $("pong-bot").textContent=runtime.bot?"BOT OPPONENT":"MANUAL OPPONENT";
-  };
-
-  update();
 }
 
-/* ============================================================
-   RACING — GENERATED TRACK
-   ============================================================ */
+/* =========================================================
+   TOP-DOWN RACING
+   ========================================================= */
 
 function renderRacing() {
-  const root=$("game-container");
-
-  root.innerHTML=`
-    <div style="text-align:center">
-      <h3>RACING AI</h3>
-      <p class="game-status" id="race-status">Circuit généré aléatoirement.</p>
-      <div id="race-scene" style="height:440px;max-width:900px;margin:auto"></div>
-      <div class="game-controls">
-        <button class="primary-button" id="race-restart">NEW RANDOM TRACK</button>
-        <button class="secondary-button" id="race-bot">BOT DRIVER</button>
+  $("game-container").innerHTML = `
+    <div class="game-center">
+      <h2>🏎️ RACING AI</h2>
+      <div id="race-status" class="game-status">Course généré aléatoirement.</div>
+      <canvas id="race-canvas" width="900" height="620"></canvas>
+      <div class="game-buttons">
+        <button class="secondary" id="race-new">NEW RANDOM TRACK</button>
       </div>
-      <p style="color:var(--muted);font-size:11px">Flèches directionnelles pour conduire manuellement.</p>
+      <p class="game-instructions">Conduis avec ZQSD ou les flèches. Le bot pilote la voiture rose. Premier à trois tours.</p>
     </div>`;
 
-  const host=$("race-scene");
-  const three=createThreeScene(host);
-  if(!three) return;
-
-  const {scene,camera,renderer}=three;
-  camera.position.set(0,15,18);
-  camera.lookAt(0,0,0);
-
-  const ground=new THREE.Mesh(
-    new THREE.PlaneGeometry(100,100),
-    new THREE.MeshStandardMaterial({color:0x28603e})
-  );
-  ground.rotation.x=-Math.PI/2;
-  ground.position.y=-.1;
-  scene.add(ground);
-
-  const trackGroup=new THREE.Group();
-  scene.add(trackGroup);
-
-  const carGeometry=new THREE.BoxGeometry(1,.5,1.8);
-
-  const player=new THREE.Mesh(
-    carGeometry,
-    new THREE.MeshStandardMaterial({color:0x35e6db})
-  );
-
-  const rival=new THREE.Mesh(
-    carGeometry,
-    new THREE.MeshStandardMaterial({color:0xff536f})
-  );
-
-  scene.add(player,rival);
-
-  gameRuntime={
-    track:[],
-    player,
-    rival,
-    speed:0,
-    angle:0,
-    progress:0,
-    bot:true,
-    running:true
-  };
-
-  const runtime=gameRuntime;
+  const canvas=$("race-canvas"),ctx=canvas.getContext("2d");
+  const W=canvas.width,H=canvas.height;
+  let track=[],inner=[],outer=[],cars=[],keys={},raf=0,last=0;
+  const trackWidth=100;
 
   function generateTrack() {
-    trackGroup.clear();
-    runtime.track=[];
+    track=[];
+    const count=13;
+    for(let i=0;i<count;i++){
+      const a=i/count*Math.PI*2;
+      const rx=280+(Math.random()-.5)*75;
+      const ry=190+(Math.random()-.5)*55;
+      track.push({
+        x:W/2+Math.cos(a)*rx,
+        y:H/2+Math.sin(a)*ry
+      });
+    }
+    buildEdges();
+  }
 
-    const points=Array.from({length:12},(_,i)=>{
-      const angle=i/12*Math.PI*2;
-      const radiusX=13+Math.random()*4;
-      const radiusZ=10+Math.random()*4;
-
-      return new THREE.Vector3(
-        Math.cos(angle)*radiusX,
-        0,
-        Math.sin(angle)*radiusZ
-      );
+  function buildEdges() {
+    inner=[];outer=[];
+    track.forEach((p,i)=>{
+      const prev=track[(i-1+track.length)%track.length];
+      const next=track[(i+1)%track.length];
+      const dx=next.x-prev.x,dy=next.y-prev.y;
+      const len=Math.hypot(dx,dy)||1;
+      const nx=-dy/len,ny=dx/len;
+      inner.push({x:p.x+nx*trackWidth/2,y:p.y+ny*trackWidth/2});
+      outer.push({x:p.x-nx*trackWidth/2,y:p.y-ny*trackWidth/2});
     });
-
-    runtime.track=points;
-
-    const curve=new THREE.CatmullRomCurve3(points,true,"catmullrom",.4);
-    const geometry=new THREE.TubeGeometry(curve,220,3,8,true);
-    const road=new THREE.Mesh(
-      geometry,
-      new THREE.MeshStandardMaterial({color:0x343b46})
-    );
-
-    trackGroup.add(road);
-
-    const centerLine=new THREE.Mesh(
-      new THREE.TubeGeometry(curve,220,.035,6,true),
-      new THREE.MeshStandardMaterial({color:0xe2e4e9})
-    );
-
-    centerLine.position.y=.05;
-    trackGroup.add(centerLine);
-
-    const start=curve.getPointAt(0);
-    player.position.set(start.x,.4,start.z);
-    rival.position.set(start.x+2,.4,start.z);
-    runtime.progress=0;
-    runtime.speed=0;
-    runtime.angle=0;
-
-    return curve;
   }
 
-  let curve=generateTrack();
-
-  function nearestTrackPoint(position) {
-    let best=0;
-    let distance=Infinity;
-
-    runtime.track.forEach((point,i)=>{
-      const d=point.distanceTo(position);
-      if(d<distance) {
-        distance=d;
-        best=i;
-      }
-    });
-
-    return {index:best,distance};
+  function pointSegmentDistance(p,a,b){
+    const dx=b.x-a.x,dy=b.y-a.y;
+    const t=Math.max(0,Math.min(1,((p.x-a.x)*dx+(p.y-a.y)*dy)/(dx*dx+dy*dy)));
+    return Math.hypot(p.x-(a.x+t*dx),p.y-(a.y+t*dy));
   }
 
-  function sensorDistance(position,direction,max=12) {
-    const origin=new THREE.Vector3(position.x,.5,position.z);
-    const ray=new THREE.Raycaster(origin,direction.clone().normalize(),0,max);
-    const hits=ray.intersectObject(trackGroup,true);
-    return hits.length ? hits[0].distance : max;
+  function nearestTrackDistance(p){
+    let min=Infinity;
+    for(let i=0;i<track.length;i++){
+      min=Math.min(min,pointSegmentDistance(p,track[i],track[(i+1)%track.length]));
+    }
+    return min;
   }
 
-  function update() {
-    if(!runtime.running) return;
+  function onRoad(p){return nearestTrackDistance(p)<trackWidth/2-7;}
 
-    const forward=new THREE.Vector3(
-      Math.sin(runtime.angle),0,
-      Math.cos(runtime.angle)
-    );
+  function newCar(x,y,angle,color,human=false){
+    return {x,y,angle,speed:0,color,human,lap:0,lastAngle:Math.atan2(y-H/2,x-W/2),progress:0};
+  }
 
-    const right=new THREE.Vector3(forward.z,0,-forward.x);
+  function resetCars(){
+    const start=track[0],next=track[1];
+    const angle=Math.atan2(next.y-start.y,next.x-start.x);
+    cars=[
+      newCar(start.x,start.y+20,angle,"#42e5dc",true),
+      newCar(start.x,start.y-20,angle,"#ff6682",false)
+    ];
+  }
 
-    const front=sensorDistance(player.position,forward);
-    const frontLeft=sensorDistance(player.position,forward.clone().add(right.clone().multiplyScalar(-.6)));
-    const frontRight=sensorDistance(player.position,forward.clone().add(right.clone().multiplyScalar(.6)));
-    const left=sensorDistance(player.position,right.clone().multiplyScalar(-1));
-    const rightDistance=sensorDistance(player.position,right);
+  function drawTrack(){
+    ctx.fillStyle="#173322";ctx.fillRect(0,0,W,H);
+    ctx.beginPath();
+    track.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.closePath();
+    ctx.strokeStyle="#3d4651";ctx.lineWidth=trackWidth;ctx.lineJoin="round";ctx.stroke();
+    ctx.strokeStyle="#e5e7eb";ctx.lineWidth=3;ctx.setLineDash([18,15]);ctx.stroke();
+    ctx.setLineDash([]);
 
-    const state={
-      speed:runtime.speed*100,
-      front,
-      frontLeft,
-      frontRight,
-      left,
-      right:rightDistance,
-      rear:10,
-      opponentDistance:player.position.distanceTo(rival.position),
-      heading:runtime.angle,
-      curve:0
+    ctx.beginPath();
+    inner.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.closePath();ctx.strokeStyle="#a6b2b8";ctx.lineWidth=3;ctx.stroke();
+
+    ctx.beginPath();
+    outer.forEach((p,i)=>i?ctx.lineTo(p.x,p.y):ctx.moveTo(p.x,p.y));
+    ctx.closePath();ctx.strokeStyle="#a6b2b8";ctx.lineWidth=3;ctx.stroke();
+
+    const s=track[0];
+    ctx.save();ctx.translate(s.x,s.y);ctx.rotate(Math.atan2(track[1].y-s.y,track[1].x-s.x));
+    ctx.fillStyle="#fff";ctx.fillRect(-4,-trackWidth/2,8,trackWidth);
+    ctx.restore();
+  }
+
+  function castRay(car,angle,max=180){
+    for(let d=0;d<=max;d+=5){
+      const p={x:car.x+Math.cos(angle)*d,y:car.y+Math.sin(angle)*d};
+      if(!onRoad(p))return d;
+    }
+    return max;
+  }
+
+  function sensorContext(car,opponent){
+    const a=car.angle;
+    const ray=(offset)=>castRay(car,a+offset);
+    const dx=opponent.x-car.x,dy=opponent.y-car.y;
+    return {
+      speed:car.speed,
+      frontDistance:ray(0),
+      frontLeftDistance:ray(-Math.PI/4),
+      frontRightDistance:ray(Math.PI/4),
+      leftDistance:ray(-Math.PI/2),
+      rightDistance:ray(Math.PI/2),
+      rearDistance:ray(Math.PI),
+      heading:car.angle,
+      trackDirection:Math.atan2(track[1].y-track[0].y,track[1].x-track[0].x),
+      opponentDistance:Math.hypot(dx,dy)
+    };
+  }
+
+  function updateCar(car,dt,control){
+    const steering=Math.max(-1,Math.min(1,Number(control.steering)||0));
+    const throttle=Math.max(0,Math.min(1,Number(control.throttle)||0));
+    const brake=Math.max(0,Math.min(1,Number(control.brake)||0));
+
+    car.angle+=steering*(.035+car.speed*.006)*dt;
+    car.speed+=throttle*.12*dt;
+    car.speed-=brake*.18*dt;
+    car.speed*=Math.pow(.985,dt);
+    car.speed=Math.max(0,Math.min(7,car.speed));
+
+    const old={x:car.x,y:car.y};
+    car.x+=Math.cos(car.angle)*car.speed*dt;
+    car.y+=Math.sin(car.angle)*car.speed*dt;
+
+    if(!onRoad(car)){
+      car.speed*=.65;
+      car.x=old.x;
+      car.y=old.y;
+    }
+
+    const angle=Math.atan2(car.y-H/2,car.x-W/2);
+    let diff=angle-car.lastAngle;
+    while(diff>Math.PI)diff-=Math.PI*2;
+    while(diff< -Math.PI)diff+=Math.PI*2;
+    if(diff>1.5)car.lap++;
+    car.lastAngle=angle;
+  }
+
+  function drawCar(car){
+    ctx.save();ctx.translate(car.x,car.y);ctx.rotate(car.angle);
+    ctx.fillStyle=car.color;
+    ctx.beginPath();ctx.roundRect(-17,-10,34,20,5);ctx.fill();
+    ctx.fillStyle="#17202b";ctx.fillRect(1,-7,9,14);
+    ctx.fillStyle="#e8f1ff";ctx.fillRect(11,-6,5,12);
+    ctx.restore();
+  }
+
+  function loop(time){
+    raf=requestAnimationFrame(loop);
+    const dt=Math.min((time-last)/16.67||1,2);
+    last=time;
+    drawTrack();
+
+    const player=cars[0],bot=cars[1];
+    const playerControl={
+      throttle:keys.arrowup||keys.z||keys.w?1:0,
+      brake:keys.arrowdown||keys.s?1:0,
+      steering:(keys.arrowright||keys.d?1:0)-(keys.arrowleft||keys.q||keys.a?1:0)
     };
 
-    const nearest=nearestTrackPoint(player.position);
-    const next=runtime.track[(nearest.index+1)%runtime.track.length];
-    const desiredAngle=Math.atan2(
-      next.x-player.position.x,
-      next.z-player.position.z
-    );
+    const context=sensorContext(bot,player);
+    const output=runActiveBot("racing",context);
+    let botControl={
+      throttle:Number(output.throttle),
+      brake:Number(output.brake),
+      steering:Number(output.steering)
+    };
 
-    let difference=desiredAngle-runtime.angle;
-    while(difference>Math.PI) difference-=Math.PI*2;
-    while(difference< -Math.PI) difference+=Math.PI*2;
+    if($("active-bot-select")?.value==="default"){
+      const front=context.frontDistance;
+      const left=context.frontLeftDistance;
+      const right=context.frontRightDistance;
+      botControl={
+        throttle:front<55?.25:.9,
+        brake:front<35?.7:0,
+        steering:left<45?.65:right<45?-.65:0
+      };
+    }
 
-    state.curve=Math.max(-1,Math.min(1,difference));
+    updateCar(player,dt,playerControl);
+    updateCar(bot,dt,botControl);
+    drawCar(player);drawCar(bot);
 
-    const decision=runtime.bot
-      ? chooseBotMove("racing",state)
-      : {throttle:runtime.speed>.6?0.5:1,brake:0,steering:state.curve};
+    $("race-status").textContent=`TOI ${player.lap}/3 TOURS  ·  BOT ${bot.lap}/3 TOURS  ·  VITESSE ${Math.round(player.speed*20)}`;
 
-    const throttle=Math.max(0,Math.min(1,Number(decision.throttle)||0));
-    const brake=Math.max(0,Math.min(1,Number(decision.brake)||0));
-    const steering=Math.max(-1,Math.min(1,Number(decision.steering)||0));
-
-    runtime.speed+=throttle*.003;
-    runtime.speed-=brake*.006;
-    runtime.speed*=.994;
-    runtime.speed=Math.max(0,Math.min(.22,runtime.speed));
-
-    runtime.angle+=steering*.025*(.3+runtime.speed*4);
-
-    player.position.x+=Math.sin(runtime.angle)*runtime.speed*10;
-    player.position.z+=Math.cos(runtime.angle)*runtime.speed*10;
-    player.rotation.y=runtime.angle;
-
-    // Rival follows the generated center line.
-    const rivalIndex=(nearest.index+Math.floor(runtime.progress/100)+3)%runtime.track.length;
-    const rivalTarget=runtime.track[rivalIndex];
-    rival.position.lerp(new THREE.Vector3(rivalTarget.x,.4,rivalTarget.z),.025);
-    rival.lookAt(runtime.track[(rivalIndex+1)%runtime.track.length]);
-
-    runtime.progress+=runtime.speed;
-
-    camera.position.x+=(player.position.x-camera.position.x)*.04;
-    camera.position.z+=(player.position.z+15-camera.position.z)*.04;
-    camera.lookAt(player.position);
-
-    $("race-status").textContent=
-      `Speed: ${Math.round(runtime.speed*400)} km/h · Front sensor: ${front.toFixed(1)} m`;
-
-    renderer.render(scene,camera);
-    gameAnimation=requestAnimationFrame(update);
+    if(player.lap>=3||bot.lap>=3){
+      cancelAnimationFrame(raf);
+      $("race-status").textContent=player.lap>=3?"Tu as gagné la course !":"Le bot a gagné la course !";
+    }
   }
 
-  function restart() {
-    curve=generateTrack();
-    $("race-status").textContent="Nouveau circuit généré.";
+  function newRace(){
+    cancelAnimationFrame(raf);
+    generateTrack();
+    resetCars();
+    last=0;
+    raf=requestAnimationFrame(loop);
   }
 
-  document.onkeydown=e=>{
-    if(runtime.bot) return;
+  function onDown(e){keys[e.key.toLowerCase()]=true;}
+  function onUp(e){keys[e.key.toLowerCase()]=false;}
+  window.addEventListener("keydown",onDown);
+  window.addEventListener("keyup",onUp);
+  $("race-new").onclick=newRace;
+  newRace();
 
-    if(e.key==="ArrowLeft") runtime.angle+=.05;
-    if(e.key==="ArrowRight") runtime.angle-=.05;
-    if(e.key==="ArrowUp") runtime.speed=Math.min(.22,runtime.speed+.01);
-    if(e.key==="ArrowDown") runtime.speed=Math.max(0,runtime.speed-.02);
+  return ()=>{
+    cancelAnimationFrame(raf);
+    window.removeEventListener("keydown",onDown);
+    window.removeEventListener("keyup",onUp);
   };
-
-  $("race-restart").onclick=restart;
-  $("race-bot").onclick=()=>{
-    runtime.bot=!runtime.bot;
-    $("race-bot").textContent=runtime.bot?"BOT DRIVER":"MANUAL DRIVER";
-  };
-
-  update();
 }
 
-/* ============================================================
-   EDITOR CONNECTION CLEAR BUTTON
-   ============================================================ */
+/* =========================================================
+   GAME ROUTER
+   ========================================================= */
 
-if($("clear-connections")) {
-  $("clear-connections").addEventListener("click",()=>{
-    connections=[];
-    pendingPort=null;
-    renderNodes();
-    updateConnectionHint("Toutes les connexions ont été supprimées.");
+function startGame(game) {
+  if(gameCleanup){gameCleanup();gameCleanup=null;}
+  currentGame=game;
+  currentGameSession={restart:()=>startGame(game)};
+
+  const cleanup = {
+    chess:renderChess,
+    connect4:renderConnect4,
+    pingpong:renderPingPong,
+    racing:renderRacing,
+    snake:renderSnake
+  }[game]();
+
+  if(typeof cleanup==="function")gameCleanup=cleanup;
+  $("edit-current-bot").onclick=()=>{
+    const bot=getActiveBot(game);
+    if(bot?.graph)loadGraphFromBot(bot);
+    else {
+      showPage("editor");
+      $("editor-game").value=game;
+      currentGame=game;
+      createNewBot();
+    }
+  };
+}
+
+/* =========================================================
+   LOAD DEFAULT BOTS
+   ========================================================= */
+
+async function loadDefaultBots(){
+  try{
+    const response=await fetch("./default-bots.json");
+    if(!response.ok)throw new Error("default-bots.json unavailable");
+    const data=await response.json();
+    if(data.format==="BOTS_ARENA_DEFAULTS"&&data.bots){
+      defaultBots=data.bots;
+    }
+  }catch(error){
+    console.warn("Default bots could not be loaded:",error);
+    defaultBots={};
+  }
+}
+
+function setupEditor(){
+  const select=$("editor-game");
+  select.innerHTML="";
+  Object.entries(GAMES).forEach(([id,game])=>{
+    const option=document.createElement("option");
+    option.value=id;
+    option.textContent=game.name;
+    select.appendChild(option);
   });
+  select.value="chess";
+  currentGame="chess";
+  graph={nodes:[],connections:[]};
+  renderEditor();
 }
 
-/* ============================================================
-   INITIALISATION
-   ============================================================ */
-
-function initialise() {
-  currentGame=$("editor-game")?.value || "chess";
-
-  renderNodeLibrary();
-  renderNodes();
+async function init(){
+  renderGameLibrary();
+  setupEditor();
+  await loadDefaultBots();
   showPage("games");
-
-  // Aide visuelle pour l'éditeur.
-  if($("connection-hint")) {
-    $("connection-hint").textContent=
-      "Clique sur une sortie puis sur une entrée compatible.";
-  }
 }
 
-initialise();
+init();
