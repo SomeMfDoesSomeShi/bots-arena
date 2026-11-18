@@ -1,43 +1,94 @@
 
 {
-  "format": "NEONLAB_DEFAULT_BOTS",
+  "format": "BOTS_ARENA_DEFAULTS",
   "version": 2,
-  "bots": [
-    {
-      "name": "Connect Four - Center",
-      "game": "connect4",
-      "description": "Privilégie le centre du plateau.",
-      "strategy": "connect4-center"
-    },
-    {
-      "name": "Connect Four - Tactical",
-      "game": "connect4",
-      "description": "Cherche une victoire immédiate, puis bloque l'adversaire.",
-      "strategy": "connect4-tactical"
-    },
-    {
-      "name": "Snake - Food Seeker",
-      "game": "snake",
-      "description": "Se dirige vers la nourriture en évitant les collisions.",
-      "strategy": "snake-food"
-    },
-    {
-      "name": "Racing - Safe Driver",
-      "game": "racing",
-      "description": "Réduit sa vitesse quand un obstacle approche.",
-      "strategy": "racing-safe"
-    },
-    {
-      "name": "Ping Pong - Tracker",
-      "game": "pingpong",
-      "description": "Suit la position de la balle.",
-      "strategy": "pong-tracker"
-    },
-    {
-      "name": "Chess - Random Legal",
+  "bots": {
+    "chess": {
+      "name": "Chess Basic AI",
       "game": "chess",
-      "description": "Choisit parmi les coups légaux.",
-      "strategy": "chess-random"
+      "graph": {
+        "nodes": [
+          {"id":"ch-event","type":"event","x":100,"y":100,"config":{}},
+          {"id":"ch-input","type":"inputs","x":390,"y":100,"config":{}},
+          {"id":"ch-output","type":"outputs","x":850,"y":100,"config":{}},
+          {"id":"ch-random","type":"random","x":600,"y":280,"config":{}}
+        ],
+        "connections": [
+          {"from":"ch-event","fromPort":"next","to":"ch-output","toPort":"exec"}
+        ]
+      }
+    },
+    "connect4": {
+      "name": "Connect Four Basic AI",
+      "game": "connect4",
+      "graph": {
+        "nodes": [
+          {"id":"c4-event","type":"event","x":100,"y":100,"config":{}},
+          {"id":"c4-input","type":"inputs","x":390,"y":100,"config":{}},
+          {"id":"c4-output","type":"outputs","x":850,"y":100,"config":{}},
+          {"id":"c4-center","type":"number","x":600,"y":280,"config":{"value":3}}
+        ],
+        "connections": [
+          {"from":"c4-event","fromPort":"next","to":"c4-output","toPort":"exec"}
+        ]
+      }
+    },
+    "pingpong": {
+      "name": "Ping Pong Tracking AI",
+      "game": "pingpong",
+      "graph": {
+        "nodes": [
+          {"id":"pp-event","type":"event","x":100,"y":100,"config":{}},
+          {"id":"pp-input","type":"inputs","x":390,"y":100,"config":{}},
+          {"id":"pp-output","type":"outputs","x":850,"y":100,"config":{}}
+        ],
+        "connections": [
+          {"from":"pp-event","fromPort":"next","to":"pp-output","toPort":"exec"},
+          {"from":"pp-input","fromPort":"ballX","to":"pp-output","toPort":"paddleTargetX"}
+        ]
+      }
+    },
+    "racing": {
+      "name": "Racing Wall Avoider",
+      "game": "racing",
+      "graph": {
+        "nodes": [
+          {"id":"ra-event","type":"event","x":100,"y":100,"config":{}},
+          {"id":"ra-input","type":"inputs","x":390,"y":100,"config":{}},
+          {"id":"ra-output","type":"outputs","x":1000,"y":100,"config":{}},
+          {"id":"ra-throttle","type":"number","x":650,"y":280,"config":{"value":0.75}},
+          {"id":"ra-brake","type":"number","x":650,"y":400,"config":{"value":0}},
+          {"id":"ra-left","type":"number","x":650,"y":520,"config":{"value":-0.35}},
+          {"id":"ra-right","type":"number","x":650,"y":640,"config":{"value":0.35}},
+          {"id":"ra-compare","type":"compare","x":400,"y":500,"config":{"operation":">"}},
+          {"id":"ra-if","type":"if","x":700,"y":800,"config":{}}
+        ],
+        "connections": [
+          {"from":"ra-event","fromPort":"next","to":"ra-output","toPort":"exec"},
+          {"from":"ra-input","fromPort":"frontDistance","to":"ra-compare","toPort":"a"},
+          {"from":"ra-throttle","fromPort":"value","to":"ra-output","toPort":"throttle"},
+          {"from":"ra-brake","fromPort":"value","to":"ra-output","toPort":"brake"},
+          {"from":"ra-input","fromPort":"frontLeftDistance","to":"ra-if","toPort":"condition"},
+          {"from":"ra-left","fromPort":"value","to":"ra-if","toPort":"yes"},
+          {"from":"ra-right","fromPort":"value","to":"ra-if","toPort":"no"},
+          {"from":"ra-if","fromPort":"result","to":"ra-output","toPort":"steering"}
+        ]
+      }
+    },
+    "snake": {
+      "name": "Snake Basic AI",
+      "game": "snake",
+      "graph": {
+        "nodes": [
+          {"id":"sn-event","type":"event","x":100,"y":100,"config":{}},
+          {"id":"sn-input","type":"inputs","x":390,"y":100,"config":{}},
+          {"id":"sn-output","type":"outputs","x":850,"y":100,"config":{}},
+          {"id":"sn-direction","type":"number","x":600,"y":280,"config":{"value":1}}
+        ],
+        "connections": [
+          {"from":"sn-event","fromPort":"next","to":"sn-output","toPort":"exec"}
+        ]
+      }
     }
-  ]
+  }
 }
