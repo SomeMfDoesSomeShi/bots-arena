@@ -3,110 +3,158 @@
 <html lang="fr">
 <head>
   <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1">
-  <title>NeonLab — AI Game Arena</title>
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta name="theme-color" content="#090d16">
+  <title>Bots Arena</title>
   <link rel="stylesheet" href="style.css">
 </head>
 <body>
 <div class="app">
   <aside class="sidebar">
     <div class="brand">
-      <div class="brand-icon">N</div>
-      <div><h1>NEONLAB</h1><small>AI GAME ARENA</small></div>
+      <div class="brand-logo">B</div>
+      <div><strong>BOTS ARENA</strong><small>AI GAME LAB</small></div>
     </div>
-    <div class="nav-label">MENU</div>
-    <button class="nav-button active" data-page="games">◈ Jeux</button>
-    <button class="nav-button" data-page="bots">⌘ Mes bots</button>
-    <button class="nav-button" data-page="editor">▦ Éditeur visuel</button>
-    <button class="nav-button" data-page="arena">⚔ Arène</button>
-    <div class="sidebar-bottom"><span class="status-dot"></span> SYSTÈME OPÉRATIONNEL<small>NEONLAB v2.0</small></div>
+
+    <div class="nav-label">PLATFORM</div>
+    <button class="nav active" data-page="games">◈ <span>Games</span></button>
+    <button class="nav" data-page="editor">▦ <span>Bot editor</span></button>
+    <button class="nav" data-page="bots">⌘ <span>My bots</span></button>
+    <button class="nav" data-page="arena">⚔ <span>Bot arena</span></button>
+
+    <div class="sidebar-bottom">
+      <span class="online-dot"></span> SYSTEM ONLINE
+      <small>BOT ARENA v2.0</small>
+    </div>
   </aside>
 
   <main>
-    <header>
-      <div><div class="eyebrow">BUILD · PROGRAM · COMPETE</div><h2 id="page-title">Game Library</h2></div>
-      <span class="online"><i></i> LOCAL SYSTEM</span>
+    <header class="topbar">
+      <div>
+        <div class="eyebrow">ARTIFICIAL INTELLIGENCE PLAYGROUND</div>
+        <h1 id="page-title">Game library</h1>
+      </div>
+      <div class="top-status"><span class="online-dot"></span> LOCAL MODE</div>
     </header>
 
     <section id="games-page" class="page active">
       <div class="hero">
         <div>
-          <div class="eyebrow">WELCOME TO THE ARENA</div>
-          <h2>YOUR AI.<br><span>YOUR RULES.</span></h2>
-          <p>Construis tes bots avec un éditeur visuel et teste-les.</p>
-          <button class="primary-button" onclick="showPage('editor')">OUVRIR L'ÉDITEUR →</button>
+          <div class="eyebrow">BUILD YOUR OWN INTELLIGENCE</div>
+          <h2>CREATE.<br><span>PROGRAM.</span><br>COMPETE.</h2>
+          <p>Crée tes bots avec un éditeur visuel et teste-les dans différents jeux.</p>
+          <button class="primary" onclick="showPage('editor')">OPEN BOT EDITOR →</button>
         </div>
-        <div class="hero-art"><div class="orbit"></div><div class="orbit orbit-two"></div><div class="core">AI</div></div>
+        <div class="hero-symbol"><div class="hero-orbit"></div><div class="hero-core">AI</div></div>
       </div>
-      <div class="section-heading"><div><h3>GAME LIBRARY</h3><p>Choisis ton terrain de jeu</p></div><span class="counter">05 GAMES</span></div>
-      <div class="game-grid">
-        <article class="game-card" onclick="selectGame('chess')"><div class="game-art chess-art">♟</div><div class="game-info"><span class="tag">STRATEGY</span><h3>Chess</h3><p>Un vrai échiquier avec coups légaux.</p><button>OPEN GAME →</button></div></article>
-        <article class="game-card" onclick="selectGame('connect4')"><div class="game-art connect-art">●</div><div class="game-info"><span class="tag">STRATEGY</span><h3>Puissance 4</h3><p>Un vrai plateau de 7 colonnes et 6 lignes.</p><button>OPEN GAME →</button></div></article>
-        <article class="game-card" onclick="selectGame('pingpong')"><div class="game-art ping-art">🏓</div><div class="game-info"><span class="tag">3D / PHYSICS</span><h3>3D Ping Pong</h3><p>Table, balle, raquettes et échanges en 3D.</p><button>OPEN GAME →</button></div></article>
-        <article class="game-card" onclick="selectGame('racing')"><div class="game-art racing-art">🏎</div><div class="game-info"><span class="tag">SIMULATION</span><h3>Racing AI</h3><p>Conduis sur un circuit généré et évite les murs.</p><button>OPEN GAME →</button></div></article>
-        <article class="game-card" onclick="selectGame('snake')"><div class="game-art snake-art">🐍</div><div class="game-info"><span class="tag">ARCADE / SOLO</span><h3>Snake</h3><p>Survis, mange et programme ton serpent.</p><button>OPEN GAME →</button></div></article>
+
+      <div class="section-title">
+        <div><h2>GAME LIBRARY</h2><p>Choisis un jeu pour commencer.</p></div>
+        <span class="muted">5 GAMES</span>
+      </div>
+      <div id="game-grid" class="game-grid"></div>
+    </section>
+
+    <section id="editor-page" class="page">
+      <div class="editor-heading">
+        <div><div class="eyebrow">VISUAL PROGRAMMING</div><h2>BOT EDITOR</h2></div>
+        <div class="editor-actions">
+          <select id="editor-game"></select>
+          <input id="bot-name" maxlength="32" value="My Bot" aria-label="Bot name">
+          <button class="secondary" id="new-bot">NEW</button>
+          <button class="secondary" id="import-bot">IMPORT</button>
+          <button class="secondary" id="export-bot">EXPORT</button>
+          <button class="primary" id="save-bot">SAVE BOT</button>
+          <input type="file" id="import-file" accept=".json,application/json" hidden>
+        </div>
+      </div>
+
+      <div class="editor-help">
+        <span><b>1</b> Ajoute des blocs</span>
+        <span><b>2</b> Relie les ports colorés</span>
+        <span><b>3</b> Teste ton bot dans le jeu</span>
+        <span class="help-right">Sortie → Entrée · Échap pour annuler un lien</span>
+      </div>
+
+      <div class="editor-layout">
+        <aside class="node-sidebar">
+          <h3>BLOCKS</h3>
+          <div id="node-library"></div>
+        </aside>
+
+        <div class="workspace">
+          <div class="workspace-bar">
+            <span>WORKSPACE / <b id="workspace-game">CHESS</b></span>
+            <div>
+              <button class="tiny-button" id="zoom-reset">RESET VIEW</button>
+              <button class="tiny-button" id="clear-graph">CLEAR</button>
+            </div>
+          </div>
+          <div id="canvas-wrap">
+            <div id="node-canvas">
+              <svg id="wires"></svg>
+              <div id="empty-workspace">
+                <strong>EMPTY WORKSPACE</strong>
+                <p>Ajoute des blocs depuis la bibliothèque.</p>
+              </div>
+            </div>
+          </div>
+          <div class="workspace-footer">
+            <span id="connection-status">Aucune connexion sélectionnée</span>
+            <span id="node-count">0 BLOCKS</span>
+          </div>
+        </div>
+
+        <aside class="properties-sidebar">
+          <h3>INSPECTOR</h3>
+          <div id="properties">
+            <p class="muted">Sélectionne un bloc pour voir ses propriétés.</p>
+          </div>
+          <div class="editor-legend">
+            <h4>PORT TYPES</h4>
+            <div><i class="port-color exec"></i> Execution</div>
+            <div><i class="port-color number"></i> Number</div>
+            <div><i class="port-color boolean"></i> Boolean</div>
+            <div><i class="port-color text"></i> Text / List</div>
+            <div><i class="port-color any"></i> Any</div>
+          </div>
+        </aside>
       </div>
     </section>
 
     <section id="bots-page" class="page">
-      <div class="section-heading"><div><h3>MY BOTS</h3><p>Tes bots sauvegardés sur cet appareil</p></div><button class="primary-button" onclick="newBot()">+ CREATE BOT</button></div>
-      <div class="bot-actions"><button class="secondary-button" onclick="importBot()">IMPORT BOT</button><button class="secondary-button" onclick="downloadDefaults()">DOWNLOAD DEFAULT BOTS</button></div>
+      <div class="section-title">
+        <div><h2>MY BOTS</h2><p>Tes bots sauvegardés dans ce navigateur.</p></div>
+        <button class="primary" onclick="createNewBot()">+ NEW BOT</button>
+      </div>
       <div id="bot-list" class="bot-list"></div>
     </section>
 
-    <section id="editor-page" class="page">
-      <div class="editor-toolbar">
-        <div><span class="eyebrow">VISUAL PROGRAMMING</span><h3>BOT EDITOR</h3></div>
-        <div class="toolbar-actions">
-          <select id="editor-game">
-            <option value="chess">Chess</option>
-            <option value="connect4">Puissance 4</option>
-            <option value="pingpong">3D Ping Pong</option>
-            <option value="racing">Racing AI</option>
-            <option value="snake">Snake</option>
-          </select>
-          <input id="bot-name" value="My First Bot" maxlength="30">
-          <button class="secondary-button" id="import-button">IMPORT</button>
-          <button class="secondary-button" id="export-button">EXPORT</button>
-          <button class="secondary-button" id="test-button">TEST BOT</button>
-          <button class="primary-button" id="save-button">SAVE BOT</button>
-        </div>
-      </div>
-      <div class="editor-help">Clique sur une prise de sortie <b>●</b>, puis sur une prise d'entrée compatible. Déplace les blocs avec leur en-tête. Clic droit sur un bloc pour le supprimer.</div>
-      <div class="editor-layout">
-        <aside class="node-library"><h4>NODE LIBRARY</h4><div id="node-library-content"></div></aside>
-        <div class="workspace">
-          <div class="workspace-top"><span>WORKSPACE / <b id="workspace-game">CHESS</b></span><span id="connection-hint">Sélectionne une prise pour commencer</span><button id="clear-connections" class="tiny-button">CLEAR WIRES</button></div>
-          <div id="node-canvas" class="node-canvas">
-            <svg id="connections"></svg>
-            <div id="empty-message"><div>＋</div><b>WORKSPACE</b><p>Ajoute des blocs depuis la bibliothèque.</p></div>
-          </div>
-        </div>
-        <aside class="node-properties"><h4>PROPERTIES</h4><div id="properties-content">Sélectionne un bloc.</div></aside>
-      </div>
-      <div id="test-result" class="test-result">Le résultat du test de ton bot apparaîtra ici.</div>
-    </section>
-
     <section id="arena-page" class="page">
-      <div class="section-heading"><div><h3>BOT ARENA</h3><p>Affrontements et tests</p></div></div>
-      <div class="arena-panel"><h3>TEST YOUR AI</h3><p>Crée ou importe un bot, puis ouvre le jeu correspondant pour le tester.</p><button class="primary-button" onclick="showPage('editor')">OPEN BOT EDITOR</button></div>
+      <div class="section-title">
+        <div><h2>BOT ARENA</h2><p>Prépare des affrontements entre tes bots.</p></div>
+      </div>
+      <div class="arena-panel">
+        <h2>BOT VS BOT</h2>
+        <p>Choisis un jeu depuis la bibliothèque pour lancer une partie. Les bots compatibles peuvent être sélectionnés dans les options de chaque jeu.</p>
+        <button class="primary" onclick="showPage('games')">CHOOSE A GAME</button>
+      </div>
     </section>
 
     <section id="game-page" class="page">
-      <div class="game-toolbar">
-        <button class="secondary-button" onclick="showPage('games')">← BACK</button>
-        <div><span class="eyebrow">GAME SESSION</span><h3 id="selected-game-title">GAME</h3></div>
-        <button class="primary-button" onclick="openEditorForGame()">PROGRAM BOT →</button>
+      <div class="game-heading">
+        <button class="secondary" onclick="showPage('games')">← BACK</button>
+        <div><div class="eyebrow">GAME SESSION</div><h2 id="game-title">GAME</h2></div>
+        <button class="primary" id="edit-current-bot">PROGRAM BOT →</button>
       </div>
+      <div id="game-options" class="game-options"></div>
       <div id="game-container" class="game-container"></div>
     </section>
   </main>
 </div>
 
-<input id="bot-file-input" type="file" accept=".json,application/json" hidden>
-
-<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="https://cdnjs.cloudflare.com/ajax/libs/chess.js/0.10.3/chess.min.js"></script>
+<script src="https://cdn.jsdelivr.net/npm/three@0.160.0/build/three.min.js"></script>
 <script src="app.js"></script>
 </body>
 </html>
